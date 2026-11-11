@@ -35,7 +35,10 @@ LINE ──webhook POST {destination,events}──► /exec เดียวก�
 | `apps-script/Code.gs` | Backend JSON API + LINE webhook — **คัดลอกไปวางใน Apps Script เอง** (ไม่ได้ deploy อัตโนมัติจาก repo) |
 | `tests/gasmock.js` | Mock ของ SpreadsheetApp/DriveApp/UrlFetchApp/ฯลฯ ในหน่วยความจำ ให้รัน Code.gs ใน Node ได้ |
 | `tests/api.test.js` | ทดสอบ API ผ่าน doGet/doPost แบบเดียวกับที่ index.html เรียก — `node tests/api.test.js` |
-| `docs/SETUP-legacy-htmlservice.md` | คู่มือติดตั้งเวอร์ชันเดิม (HtmlService) — ส่วน LINE/ชีตยังใช้ได้ ส่วน Deploy ให้ดูหัวข้อด้านล่างแทน |
+| `tests/e2e.test.js` | ทดสอบหน้าเว็บทั้ง flow ใน Chromium กับ Code.gs จริง — `node tests/e2e.test.js [โฟลเดอร์ภาพ]` |
+| `README.md` | คู่มือผู้ใช้ (ภาษาไทย) สำหรับสถาปัตยกรรมปัจจุบัน: ติดตั้ง, Deploy, GitHub Pages, LINE, อัปเดตจากเวอร์ชันเดิม, FAQ |
+| `.nojekyll` | ปิด Jekyll ของ GitHub Pages (ดูข้อควรระวัง) |
+| `docs/SETUP-legacy-htmlservice.md` | คู่มือติดตั้งเวอร์ชันเดิม (HtmlService) — เก็บไว้อ้างอิง; คู่มือปัจจุบันคือ `README.md` |
 | `docs/sample-output.jpg` | ตัวอย่างภาพตารางสอนแทนที่ระบบสร้าง |
 
 ## สถานะปัจจุบัน
@@ -44,13 +47,14 @@ LINE ──webhook POST {destination,events}──► /exec เดียวก�
 - เวอร์ชันแรก (Apps Script HtmlService: `Code.gs` + `Index.html`) ทำครบทุกฟีเจอร์ ทดสอบด้วย mock แล้ว
 - แปลงเป็น GitHub Pages + API: `index.html` push ขึ้น repo แล้ว (commit `4cc1957`, 2026-09-27) — แทน `google.script.run` ด้วย `fetch()` และมีช่องกรอก URL API ในแท็บตั้งค่า
 - `apps-script/Code.gs` เวอร์ชัน API อยู่ในโฟลเดอร์นี้ ผ่าน `tests/api.test.js` 19 ข้อ (เวอร์ชันนี้สร้างใหม่ให้ตรงกับ index.html — **ถ้าใน Apps Script ของผู้ใช้มี Code.gs ที่แก้เองไว้ ให้เทียบกับตัวนั้นก่อนทับ**)
+- 2026-11-11 (branch `claude/upbeat-curie-mt0k04`): นำ `apps-script/`, `tests/`, `docs/`, `CLAUDE.md` เข้า repo; เพิ่ม `README.md` (คู่มือติดตั้งปัจจุบัน), `.nojekyll`, `tests/e2e.test.js` (ผ่าน 21 ข้อ); index.html: fetch ล้มเหลวแจ้งเป็นภาษาไทยพร้อมวิธีตรวจ (`netFail`), บันทึก URL แล้วแจ้ง "เชื่อมต่อสำเร็จ ✓", ช่อง Webhook URL ใช้ `apiUrl()` — Code.gs ไม่ได้แก้
 
-**ยังต้องทำ (ขั้นตอนที่ผู้ใช้ทำเองในเบราว์เซอร์ — ยังไม่ยืนยันว่าทำแล้ว)**
-1. เปิด GitHub Pages: repo Settings → Pages → Deploy from branch `main` / root
-2. วาง `apps-script/Code.gs` ทับใน Apps Script → Deploy → จัดการการทำให้ใช้งานได้ → แก้ไข → **เวอร์ชันใหม่**
-3. นำ URL `/exec` ไปกรอกในหน้าเว็บ แท็บ ⚙️ ตั้งค่า → การเชื่อมต่อ API (หรือฝังใน `APPS_SCRIPT_URL` ใน index.html)
-4. ตรวจ Webhook URL ใน LINE Developers Console ให้เป็น `/exec` เดียวกัน
-5. Commit โฟลเดอร์ `apps-script/`, `tests/`, `docs/`, `CLAUDE.md` เข้า repo (ตอนนี้ repo มีแค่ `index.html`)
+**ยังต้องทำ (ขั้นตอนที่ผู้ใช้ทำเองในเบราว์เซอร์ — ยังไม่ยืนยันว่าทำแล้ว; วิธีทำละเอียดอยู่ใน README.md)**
+1. Merge branch `claude/upbeat-curie-mt0k04` เข้า `main` (GitHub Pages เสิร์ฟจาก `main` — ก่อน merge หน้าเว็บจริงยังเป็น commit `4cc1957`)
+2. เปิด GitHub Pages: repo Settings → Pages → Deploy from branch `main` / root
+3. วาง `apps-script/Code.gs` ทับใน Apps Script → Deploy → จัดการการทำให้ใช้งานได้ → แก้ไข → **เวอร์ชันใหม่**
+4. นำ URL `/exec` ไปกรอกในหน้าเว็บ แท็บ ⚙️ ตั้งค่า → การเชื่อมต่อ API (ไม่แนะนำฝังใน `APPS_SCRIPT_URL` เพราะหน้าเว็บเป็นสาธารณะ — ดู README หัวข้อความปลอดภัย)
+5. ตรวจ Webhook URL ใน LINE Developers Console ให้เป็น `/exec` เดียวกัน
 6. ถ้าเคยมี UI เดิมใน Apps Script ให้ลบไฟล์ `Index` ออก (doGet ไม่ใช้แล้ว)
 
 ## ฐานข้อมูล (Google Sheets) — `setup()` สร้างให้พร้อมข้อมูลตัวอย่าง
@@ -115,19 +119,27 @@ Script Properties: `SS_ID`, `FOLDER_ID` (โฟลเดอร์ Drive "ภา�
 - บัญชี Google Workspace ของโรงเรียนอาจห้ามแชร์ "ทุกคนที่มีลิงก์" → ภาพส่งไลน์ไม่ได้ แนะนำติดตั้งด้วย Gmail ส่วนตัว
 - วันที่/เวลาในชีตตั้ง number format เป็นข้อความ (`@`) ใน `setup()` เพื่อกัน Sheets แปลงเป็น Date; โค้ดอ่านด้วย `dateStr_`/`timeStr_` รองรับทั้งสองแบบ
 - เขตเวลา `Asia/Bangkok` ตายตัว (`TZ`); ปี พ.ศ. = ค.ศ. + 543
-- PIN เป็นรหัสร่วมตัวเดียวเก็บในชีต (plain text) และจำในเครื่องผู้ใช้; ใครมีลิงก์ดูข้อมูล GET ได้โดยไม่ต้องใช้ PIN
+- PIN เป็นรหัสร่วมตัวเดียวเก็บในชีต (plain text) และจำในเครื่องผู้ใช้; ใครมีลิงก์ดูข้อมูล GET ได้โดยไม่ต้องใช้ PIN; ยังไม่มีการจำกัดจำนวนครั้งที่ใส่ PIN ผิด
+- **ห้ามลบ `.nojekyll`** — ถ้าไม่มี GitHub Pages จะรัน Jekyll/Liquid กับไฟล์ `.md` (CLAUDE.md มี `{{`/`}}`) ซึ่งอาจทำให้ build เพี้ยนหรือล้ม
+- `ScriptApp.getService().getUrl()` อาจคืน URL อื่น (เช่น `/dev`) → ช่อง Webhook URL ในหน้าตั้งค่าจึงแสดง `apiUrl()` (URL /exec ที่หน้าเว็บเรียกอยู่จริง) ก่อน `webAppUrl`
+- sandbox ของ Claude เข้า `*.github.io` ไม่ได้ → ตรวจสถานะ GitHub Pages จริงเองไม่ได้ ต้องถามผู้ใช้
 
 ## การทดสอบ
 
 - `node tests/api.test.js` — ต้องผ่านทุกข้อก่อน commit การแก้ Code.gs
-- ทดสอบหน้าเว็บ: เปิด `index.html` ด้วย Playwright (มี Chromium) แล้ว stub `fetch` ให้เรียกฟังก์ชันใน Code.gs ผ่าน `doGet`/`doPost` ของ mock — viewport 390×844, เช็ก `document.documentElement.scrollWidth === 390`, ดูภาพจาก `#previewImg`
-- ไม่มี internet ไป Google Fonts ใน sandbox → ใช้ `npm i @fontsource/sarabun` แล้วแทน `<link>` ด้วย `@font-face` ไฟล์ local ตอนทดสอบเท่านั้น
+- `node tests/e2e.test.js [โฟลเดอร์ภาพ]` — ทดสอบหน้าเว็บทั้ง flow (ตั้ง URL → เพิ่มครู → จัดอัตโนมัติ → PIN → ภาพ → LINE → สถิติ) บน viewport 390×844 กับ Code.gs จริง; ให้รันทุกครั้งที่แก้ index.html หรือ Code.gs ใส่โฟลเดอร์ภาพเพื่อดู `preview.jpg`/screenshot
+  - หน้าเว็บกับ API ใช้ http server ในเครื่องคนละ origin; API ตอบ 302 ไป `/macros/echo` แบบ Apps Script และตอบ OPTIONS ด้วย 405 (จับ CORS preflight ได้)
+  - ใช้ server จริงแทน `page.route` เพราะ Playwright route **ไม่ดักคำขอที่ตามหลัง redirect** (คำขอ echo จะหลุดออกเน็ตแล้วล้ม)
+  - "วันนี้" ของ backend ถูกตรึงเป็น 2026-09-28 (วันจันทร์) โดยแทน `todayStr_` ในเทสต์
+- ฟอนต์ Sarabun: sandbox ไม่มี internet ไป Google Fonts → `npm i @fontsource/sarabun` ในโฟลเดอร์ที่รันคำสั่ง (เช่น scratchpad แล้วรัน `node /path/to/tests/e2e.test.js` จากที่นั่น) เทสต์จะดัก `fonts.googleapis.com` มาใช้ไฟล์ local ให้เอง; ถ้าไม่มีจะใช้ฟอนต์สำรอง (เทสต์ยังผ่าน)
 
 ## ไอเดียต่อยอด (ยังไม่ได้ทำ)
 
-- ฝัง `APPS_SCRIPT_URL` ใน index.html เพื่อไม่ต้องกรอกในทุกเครื่อง
+- ฝัง `APPS_SCRIPT_URL` ใน index.html เพื่อไม่ต้องกรอกในทุกเครื่อง (ข้อเสีย: หน้าเว็บเป็นสาธารณะ = เปิดเผย URL ที่อ่านข้อมูลได้ — ดูทางเลือกลิงก์ `#api=` ด้านล่าง)
 - ลบภาพเก่าใน Drive อัตโนมัติ (ตอนนี้ภาพถูกสร้างซ้ำทุกครั้งที่เปิดตัวอย่าง/ส่ง)
 - PWA (manifest + icon) ให้ "เพิ่มไปยังหน้าจอหลัก" สวยขึ้น
 - แจ้งเตือนส่วนตัว (push 1:1) ให้ครูที่ถูกจัด หรือส่งตอนเช้าอัตโนมัติด้วย time-driven trigger
 - PIN แยกรายผู้ใช้ / hash PIN
+- ล็อก PIN ชั่วคราวเมื่อใส่ผิดหลายครั้ง (CacheService) — ตอนนี้เดา PIN 4 หลักได้ไม่จำกัดถ้ารู้ URL /exec (ระวังข้อความล็อกอย่ามีคำว่า "PIN" เพราะ `pinFail` ฝั่งหน้าเว็บจะล้าง PIN ที่จำไว้)
+- ลิงก์ตั้งค่า URL อัตโนมัติ (เช่น `…/teachtimetables/#api=<url>`) ให้ผู้ดูแลแชร์ในกลุ่มไลน์ แทนการให้แต่ละเครื่องวาง URL เอง และไม่ต้องฝัง URL ในหน้าเว็บสาธารณะ
 - นำเข้าตารางสอนจาก Excel
