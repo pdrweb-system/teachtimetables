@@ -298,14 +298,20 @@ function run(fn) {
 
   if (GET_FUNCTIONS[fn]) {
     var url = base + '?fn=' + encodeURIComponent(fn) + '&args=' + encodeURIComponent(JSON.stringify(args));
-    return fetch(url).then(readJson).then(unwrap);
+    return fetch(url).then(readJson, netFail).then(unwrap);
   }
   // POST: ส่ง body เป็น string เฉย ๆ (ไม่ตั้ง Content-Type เอง) เพื่อไม่ให้เบราว์เซอร์ยิง CORS preflight
   // — เบราว์เซอร์จะใส่ text/plain ให้อัตโนมัติ ซึ่ง Apps Script อ่านและ JSON.parse ได้ตามปกติ
   return fetch(base, {
     method: 'POST',
     body: JSON.stringify({ fn: fn, args: args }),
-  }).then(readJson).then(unwrap);
+  }).then(readJson, netFail).then(unwrap);
+}
+
+// fetch ล้มเหลวทั้งก้อน (เบราว์เซอร์แจ้งแค่ "Failed to fetch") — มักเกิดจากเน็ตหลุด, URL ผิด/เป็น /dev,
+// หรือ Deploy โดยไม่ได้ตั้งผู้มีสิทธิ์เข้าถึงเป็น "ทุกคน" (Google จะพาไปหน้า login ซึ่งเรียกข้ามโดเมนไม่ได้)
+function netFail() {
+  throw new Error('เชื่อมต่อ Apps Script ไม่ได้ — ตรวจสอบอินเทอร์เน็ต และ URL ในแท็บ “ตั้งค่า” (ต้องลงท้ายด้วย /exec และ Deploy โดยให้ “ทุกคน” เข้าถึงได้)');
 }
 
 function readJson(res) {
@@ -389,10 +395,13 @@ $('#apiUrlSaveBtn').onclick = function () {
   }
   store('apiUrl', v);
   toast('บันทึก URL แล้ว ✓ กำลังโหลดข้อมูลใหม่…');
-  boot();
+  boot().then(function (ok) {
+    if (ok) toast('เชื่อมต่อสำเร็จ ✓ ' + (S.init.school || ''));
+  });
 };
 
 /* ═══════════════ เริ่มต้น ═══════════════ */
+// คืนค่า Promise<boolean> — true เมื่อโหลดข้อมูลจาก API ได้
 function boot() {
   S.pin = load('subpin');
   updatePinState();
@@ -401,18 +410,19 @@ function boot() {
     $('#absentList').innerHTML = '<div class="empty">ยังไม่ได้ตั้งค่า URL ของ Apps Script<br>ไปที่แท็บ “ตั้งค่า” ด้านล่างเพื่อกรอก URL ก่อนใช้งาน</div>';
     showTab('settings');
     toast('กรุณาตั้งค่า URL ของ Apps Script ก่อน', true);
-    return;
+    return Promise.resolve(false);
   }
   loading(true, 'กำลังโหลดข้อมูล…');
-  run('getInitData').then(function (init) {
+  return run('getInitData').then(function (init) {
     applyInit(init);
     $('#date').value = init.today;
     $('#statMonth').value = init.today.slice(0, 7);
-    return loadDate(init.today, true);
+    return loadDate(init.today, true).then(function () { return true; });
   }).catch(function (e) {
     toast(errMsg(e), true);
     $('#absentList').innerHTML = '<div class="empty">โหลดข้อมูลไม่สำเร็จ: ' + h(errMsg(e)) + '</div>';
-  }).then(function () { loading(false); });
+    return false;
+  }).then(function (ok) { loading(false); return ok; });
 }
 function applyInit(init) {
   S.init = init; S.tmap = {}; S.pmap = {};
@@ -968,7 +978,8 @@ function renderLine(d) {
     '<div class="muted">ผูกไลน์แล้ว</div><div>' + linked + ' / ' + d.teachers.length + ' คน</div>' +
     '</div>' +
     '<div style="margin-top:14px"><div class="small muted">Webhook URL (นำไปวางใน LINE Developers)</div>' +
-    '<input type="text" readonly value="' + h(S.init.webAppUrl || '') + '" onclick="this.select()"></div>' +
+    // ใช้ URL /exec ที่หน้านี้เรียกอยู่จริง — ScriptApp.getService().getUrl() ฝั่งเซิร์ฟเวอร์อาจคืน URL อื่น (เช่น /dev)
+    '<input type="text" readonly value="' + h(apiUrl() || S.init.webAppUrl || '') + '" onclick="this.select()"></div>' +
     '<div style="margin-top:10px"><div class="small muted">Channel access token (long-lived)</div>' +
     '<div class="row"><input type="password" id="tokenInput" class="grow" placeholder="' + (d.hasToken ? '•••••• (บันทึกแล้ว — วางใหม่เพื่อเปลี่ยน)' : 'วาง token ที่นี่') + '">' +
     '<button class="btn sm pri" id="saveTokenBtn">บันทึก</button></div></div>' +
