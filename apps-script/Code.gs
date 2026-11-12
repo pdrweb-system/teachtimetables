@@ -30,7 +30,6 @@ HEADERS[SH.IMAGES] = ['วันที่', 'fileId', 'url', 'สร้างเ
 
 const SET = {
   SCHOOL: 'ชื่อโรงเรียน',
-  PIN: 'รหัส PIN',
   GROUP: 'LINE groupId',
   SIGNER: 'ผู้จัดตารางสอนแทน',
   FOOTER: 'ข้อความท้ายประกาศไลน์',
@@ -54,7 +53,7 @@ const HELP_TEXT = [
 
 // ───────────────────────── JSON API (หน้าเว็บอยู่บน GitHub Pages) ─────────────────────────
 // หน้าเว็บเรียก: GET  ?fn=<ชื่อ>&args=<JSON array>      → ฟังก์ชันอ่านอย่างเดียว
-//               POST body (text/plain) {"fn":..,"args":[..]} → ฟังก์ชันที่ต้องใช้ PIN
+//               POST body (text/plain) {"fn":..,"args":[..]} → ฟังก์ชันที่เขียนข้อมูล/ส่งไลน์
 // ทุกคำตอบเป็น {ok:true,result} หรือ {ok:false,error}
 // ต้องตรงกับ GET_FUNCTIONS ใน index.html
 const GET_API = {
@@ -64,7 +63,6 @@ const GET_API = {
 };
 
 const POST_API = {
-  verifyPin: verifyPin,
   saveDay: saveDay,
   saveImageToDrive: saveImageToDrive,
   sendToLine: sendToLine,
@@ -145,9 +143,8 @@ function setup() {
 function seedIfEmpty_() {
   const st = sheet_(SH.SETTINGS);
   if (st.getLastRow() < 2) {
-    st.getRange(2, 1, 5, 3).setValues([
+    st.getRange(2, 1, 4, 3).setValues([
       [SET.SCHOOL, 'โรงเรียนตัวอย่าง', 'แสดงบนหัวภาพตารางสอนแทน'],
-      [SET.PIN, '1234', 'รหัสสำหรับบันทึก/ส่งไลน์ — ควรเปลี่ยนทันที'],
       [SET.GROUP, '', 'ระบบกรอกให้อัตโนมัติเมื่อเชิญบอทเข้ากลุ่มไลน์'],
       [SET.SIGNER, 'งานวิชาการ', 'แสดงท้ายภาพ'],
       [SET.FOOTER, 'ขอบคุณคุณครูทุกท่านที่ช่วยดูแลนักเรียน 🙏', 'ข้อความท้ายประกาศในไลน์'],
@@ -275,11 +272,6 @@ function setSetting_(key, value) {
   sh.appendRow([key, value, '']);
 }
 
-function checkPin_(pin) {
-  const real = settings_()[SET.PIN] || '1234';
-  if (str_(pin) !== real) throw new Error('รหัส PIN ไม่ถูกต้อง');
-}
-
 function teachers_() {
   return rows_(SH.TEACHERS).map(function (r, i) {
     return {
@@ -363,11 +355,8 @@ function getDateData(date) {
   };
 }
 
-function verifyPin(pin) { checkPin_(pin); return true; }
-
 /** บันทึกรายการสอนแทนของทั้งวัน (แทนที่ข้อมูลเดิมของวันนั้น) */
-function saveDay(pin, date, rows) {
-  checkPin_(pin);
+function saveDay(date, rows) {
   date = checkDate_(date);
   const names = {};
   teachers_().forEach(function (t) { names[t.name] = true; });
@@ -425,8 +414,7 @@ function saveDay(pin, date, rows) {
 }
 
 /** เก็บภาพตารางสอนแทนลง Google Drive (ใช้ทั้งส่งไลน์และตอบคำสั่งในกลุ่ม) */
-function saveImageToDrive(pin, date, dataUrl) {
-  checkPin_(pin);
+function saveImageToDrive(date, dataUrl) {
   date = checkDate_(date);
   return saveImage_(date, dataUrl);
 }
@@ -458,8 +446,7 @@ function folder_() {
 }
 
 /** ส่งภาพ + ข้อความแท็กชื่อเข้ากลุ่มไลน์ (push — ใช้โควตาข้อความ) */
-function sendToLine(pin, date, dataUrl) {
-  checkPin_(pin);
+function sendToLine(date, dataUrl) {
   date = checkDate_(date);
   if (!PROP.getProperty('LINE_TOKEN')) throw new Error('ยังไม่ได้ใส่ Channel access token (เมนู ตั้งค่า)');
   const groupId = settings_()[SET.GROUP];
@@ -590,8 +577,7 @@ function getStats(month) {
 }
 
 // ───────────────────────── ตั้งค่า LINE ─────────────────────────
-function getAdminData(pin) {
-  checkPin_(pin);
+function getAdminData() {
   const st = settings_();
   const hasToken = !!PROP.getProperty('LINE_TOKEN');
   let bot = null;
@@ -621,8 +607,7 @@ function getAdminData(pin) {
   };
 }
 
-function saveLineToken(pin, token) {
-  checkPin_(pin);
+function saveLineToken(token) {
   token = str_(token);
   if (!token) throw new Error('กรุณาวาง Channel access token');
   const old = PROP.getProperty('LINE_TOKEN');
@@ -637,8 +622,7 @@ function saveLineToken(pin, token) {
   }
 }
 
-function linkTeacherLine(pin, teacherName, userId) {
-  checkPin_(pin);
+function linkTeacherLine(teacherName, userId) {
   const t = teachers_().filter(function (x) { return x.name === teacherName; })[0];
   if (!t) throw new Error('ไม่พบชื่อครู');
   userId = str_(userId);
@@ -651,8 +635,7 @@ function linkTeacherLine(pin, teacherName, userId) {
   return true;
 }
 
-function sendLineTest(pin) {
-  checkPin_(pin);
+function sendLineTest() {
   const groupId = settings_()[SET.GROUP];
   if (!groupId) throw new Error('ยังไม่ได้เชื่อมกลุ่มไลน์');
   lineApi_('/v2/bot/message/push', { to: groupId, messages: [{ type: 'text', text: '✅ ทดสอบระบบจัดสอนแทน — เชื่อมต่อกลุ่มสำเร็จ\n\n' + HELP_TEXT }] });

@@ -164,15 +164,6 @@
   <!-- ───────── แท็บตั้งค่า ───────── -->
   <section class="tab" id="tab-settings">
     <div class="card">
-      <div class="card-h"><h2>การเข้าใช้งาน</h2><span id="pinState"></span></div>
-      <div class="muted small">ต้องใส่รหัส PIN ก่อนบันทึกหรือส่งไลน์ (เปลี่ยนรหัสได้ในชีต “ตั้งค่า”)</div>
-      <div class="row" style="margin-top:10px">
-        <button class="btn line grow" id="loginBtn">ใส่รหัส PIN</button>
-        <button class="btn line grow" id="logoutBtn">ออกจากระบบ</button>
-      </div>
-    </div>
-
-    <div class="card">
       <div class="card-h"><h2>ข้อมูลครูและตารางสอน</h2></div>
       <div class="muted small">แก้รายชื่อครู คาบเรียน และตารางสอนได้ใน Google Sheet</div>
       <div class="row" style="margin-top:10px">
@@ -254,18 +245,6 @@
   </div>
 </div>
 
-<!-- ใส่รหัส PIN -->
-<div class="modal" id="pinModal">
-  <div class="sheet">
-    <div class="sheet-h"><h3>ใส่รหัส PIN</h3><button class="icon-btn" data-close="pinModal">✕</button></div>
-    <div class="sheet-b">
-      <input type="password" id="pinInput" inputmode="numeric" placeholder="รหัส PIN" autocomplete="off">
-      <div class="muted small" style="margin-top:6px">รหัสจะถูกจำไว้ในเครื่องนี้</div>
-    </div>
-    <div class="sheet-f"><button class="btn pri block" id="pinOk">ยืนยัน</button></div>
-  </div>
-</div>
-
 <div id="toast"></div>
 <div id="loading"><div class="spin"></div><div id="loadingText">กำลังโหลด…</div></div>
 
@@ -280,7 +259,7 @@ function apiUrl() {
 }
 
 /* ═══════════════ ส่วนกลาง ═══════════════ */
-var S = { init: null, date: '', dd: null, plan: [], pin: '', dirty: false, tmap: {}, pmap: {}, img: null, imgDrive: null };
+var S = { init: null, date: '', dd: null, plan: [], dirty: false, tmap: {}, pmap: {}, img: null, imgDrive: null };
 var TH_MONTHS = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
 
 function $(s) { return document.querySelector(s); }
@@ -354,38 +333,7 @@ function addDays(ds, n) {
   return d.toISOString().slice(0, 10);
 }
 
-/* ═══════════════ PIN ═══════════════ */
-var pinResolver = null;
-function ensurePin() {
-  if (S.pin) return Promise.resolve(S.pin);
-  return new Promise(function (resolve) {
-    pinResolver = resolve;
-    $('#pinInput').value = '';
-    openModal('pinModal');
-    setTimeout(function () { $('#pinInput').focus(); }, 150);
-  });
-}
-$('#pinOk').onclick = function () {
-  var v = $('#pinInput').value.trim();
-  if (!v) return;
-  loading(true, 'กำลังตรวจสอบ…');
-  run('verifyPin', v).then(function () {
-    S.pin = v; store('subpin', v); closeModal('pinModal'); updatePinState();
-    toast('เข้าสู่ระบบแล้ว ✓');
-    if (pinResolver) { pinResolver(v); pinResolver = null; }
-  }).catch(function (e) { toast(errMsg(e), true); }).then(function () { loading(false); });
-};
-$('#pinInput').addEventListener('keydown', function (e) { if (e.key === 'Enter') $('#pinOk').click(); });
-function pinFail(e) {
-  var m = errMsg(e);
-  if (m.indexOf('PIN') >= 0) { S.pin = ''; store('subpin', null); updatePinState(); }
-  toast(m, true);
-}
-function updatePinState() {
-  $('#pinState').innerHTML = S.pin ? '<span class="pill ok">เข้าสู่ระบบแล้ว</span>' : '<span class="pill no">ยังไม่เข้าสู่ระบบ</span>';
-}
-$('#loginBtn').onclick = function () { S.pin = ''; ensurePin(); };
-$('#logoutBtn').onclick = function () { S.pin = ''; store('subpin', null); updatePinState(); $('#lineBox').innerHTML = '<button class="btn ghost block" id="loadLineBtn">แสดงการตั้งค่า LINE</button>'; toast('ออกจากระบบแล้ว'); };
+function pinFail(e) { toast(errMsg(e), true); }
 
 /* ═══════════════ ตั้งค่า URL ของ API ═══════════════ */
 $('#apiUrlSaveBtn').onclick = function () {
@@ -403,8 +351,6 @@ $('#apiUrlSaveBtn').onclick = function () {
 /* ═══════════════ เริ่มต้น ═══════════════ */
 // คืนค่า Promise<boolean> — true เมื่อโหลดข้อมูลจาก API ได้
 function boot() {
-  S.pin = load('subpin');
-  updatePinState();
   $('#apiUrlInput').value = apiUrl();
   if (!apiUrl()) {
     $('#absentList').innerHTML = '<div class="empty">ยังไม่ได้ตั้งค่า URL ของ Apps Script<br>ไปที่แท็บ “ตั้งค่า” ด้านล่างเพื่อกรอก URL ก่อนใช้งาน</div>';
@@ -669,7 +615,7 @@ $('#saveBtn').onclick = function () {
   S.plan.forEach(function (a) { a.slots.forEach(function (s) { if (!s.sub) open++; if (slotConflict(s)) bad++; }); });
   if (bad) { toast('มีรายการที่ชนกัน ' + bad + ' คาบ กรุณาแก้ก่อนบันทึก', true); return; }
   if (open && !confirm('ยังมี ' + open + ' คาบที่ไม่มีผู้สอนแทน บันทึกต่อหรือไม่?')) return;
-  ensurePin().then(function (pin) {
+  Promise.resolve().then(function () {
     var rows = [];
     S.plan.forEach(function (a) {
       if (!a.slots.length) rows.push({ absent: a.absent, reason: a.reason, note: a.note, period: '', subject: '', room: '', sub: '' });
@@ -678,7 +624,7 @@ $('#saveBtn').onclick = function () {
       });
     });
     loading(true, 'กำลังบันทึก…');
-    return run('saveDay', pin, S.date, rows).then(function (dd) {
+    return run('saveDay', S.date, rows).then(function (dd) {
       S.dd = dd; buildPlan(); S.dirty = false; S.img = null; S.imgDrive = null; render();
       toast('บันทึกแล้ว ✓');
       loading(false);
@@ -840,16 +786,16 @@ function openPreview() {
     loading(false);
     openModal('previewModal');
     // เก็บภาพลง Drive เบื้องหลัง เพื่อให้คำสั่ง "สอนแทน" ในกลุ่มไลน์ส่งภาพได้
-    if (S.pin) run('saveImageToDrive', S.pin, S.date, data).then(function (r) { if (S.img === data) S.imgDrive = r; }).catch(function () {});
+    run('saveImageToDrive', S.date, data).then(function (r) { if (S.img === data) S.imgDrive = r; }).catch(function () {});
   }).catch(function (e) { loading(false); toast('สร้างภาพไม่สำเร็จ: ' + errMsg(e), true); });
 }
 
 $('#sendLineBtn').onclick = function () {
   if (!S.img) return;
   if (!confirm('ส่งภาพและข้อความเข้ากลุ่มไลน์ พร้อมแท็กชื่อครูสอนแทน?')) return;
-  ensurePin().then(function (pin) {
+  Promise.resolve().then(function () {
     loading(true, 'กำลังส่งเข้ากลุ่มไลน์…');
-    return run('sendToLine', pin, S.date, S.imgDrive ? null : S.img).then(function (r) {
+    return run('sendToLine', S.date, S.imgDrive ? null : S.img).then(function (r) {
       loading(false);
       toast('ส่งเข้ากลุ่มไลน์แล้ว ✓' + (r.untagged && r.untagged.length ? ' (ไม่ได้แท็ก: ' + r.untagged.join(', ') + ')' : ''));
       closeModal('previewModal');
@@ -880,9 +826,9 @@ $('#driveBtn').onclick = function () {
   var w = window.open('about:blank', '_blank');
   var go = function (r) { S.imgDrive = r; if (w) w.location.href = r.viewUrl; else window.open(r.viewUrl, '_blank'); };
   if (S.imgDrive) { go(S.imgDrive); return; }
-  ensurePin().then(function (pin) {
+  Promise.resolve().then(function () {
     loading(true, 'กำลังบันทึกลง Drive…');
-    return run('saveImageToDrive', pin, S.date, S.img).then(function (r) { loading(false); go(r); });
+    return run('saveImageToDrive', S.date, S.img).then(function (r) { loading(false); go(r); });
   }).catch(function (e) { loading(false); if (w) w.close(); pinFail(e); });
 };
 
@@ -947,16 +893,16 @@ $('#lineBox').addEventListener('change', function (e) {
   var el = e.target;
   if (!el.hasAttribute('data-teacher')) return;
   loading(true, 'กำลังบันทึก…');
-  run('linkTeacherLine', S.pin, el.getAttribute('data-teacher'), el.value).then(function () {
+  run('linkTeacherLine', el.getAttribute('data-teacher'), el.value).then(function () {
     toast(el.value ? 'ผูกไลน์แล้ว ✓' : 'ยกเลิกการผูกแล้ว');
     return run('getInitData').then(applyInit);
   }).catch(pinFail).then(function () { loading(false); });
 });
 
 function loadLine() {
-  ensurePin().then(function (pin) {
+  Promise.resolve().then(function () {
     loading(true);
-    return run('getAdminData', pin).then(function (d) { loading(false); renderLine(d); });
+    return run('getAdminData').then(function (d) { loading(false); renderLine(d); });
   }).catch(function (e) { loading(false); pinFail(e); });
 }
 
@@ -998,14 +944,14 @@ function saveToken() {
   var v = ($('#tokenInput').value || '').trim();
   if (!v) { toast('กรุณาวาง token', true); return; }
   loading(true, 'กำลังตรวจสอบ token…');
-  run('saveLineToken', S.pin, v).then(function (r) {
+  run('saveLineToken', v).then(function (r) {
     toast('เชื่อมบอท ' + r.name + ' แล้ว ✓');
-    return run('getAdminData', S.pin).then(renderLine);
+    return run('getAdminData').then(renderLine);
   }).catch(pinFail).then(function () { loading(false); });
 }
 function testLine() {
   loading(true, 'กำลังส่ง…');
-  run('sendLineTest', S.pin).then(function () { toast('ส่งข้อความทดสอบแล้ว ✓'); })
+  run('sendLineTest').then(function () { toast('ส่งข้อความทดสอบแล้ว ✓'); })
     .catch(pinFail).then(function () { loading(false); });
 }
 

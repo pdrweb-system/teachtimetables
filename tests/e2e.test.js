@@ -136,16 +136,9 @@ const lineEvent = (events) => doPost({ postData: { contents: JSON.stringify({ de
     ok((await page.textContent('#progress')).indexOf('จัดแล้ว ' + n + '/' + n) >= 0, 'จัดอัตโนมัติครบทุกคาบ');
     ok(await page.$$eval('#absentList .slot.bad', (x) => x.length) === 0, 'ไม่มีคาบที่ชนกัน');
 
-    // ── บันทึก + PIN + ภาพ ──
+    // ── บันทึก + ภาพ (ไม่ต้องใช้ PIN) ──
     await page.click('#saveBtn');
-    await page.waitForSelector('#pinModal.on');
-    await page.fill('#pinInput', '0000');
-    await page.click('#pinOk');
-    await toastHas('PIN');
-    await idle();
-    ok(true, 'PIN ผิด → ไม่ให้บันทึก');
-    await page.fill('#pinInput', '1234');
-    await page.click('#pinOk');
+    ok(await page.$('#pinModal') === null, 'ไม่มีหน้าจอขอ PIN');
     await page.waitForSelector('#previewModal.on', { timeout: 15000 });
     await idle();
     const img = await page.$eval('#previewImg', (i) => ({ src: i.src, w: i.naturalWidth }));

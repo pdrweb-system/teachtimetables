@@ -15,7 +15,7 @@
 ```
 มือถือครู ──► GitHub Pages: index.html (UI ทั้งหมด, ไฟล์เดียว)
                  │ fetch GET  ?fn=&args=          (อ่านอย่างเดียว)
-                 │ fetch POST {"fn","args"} text/plain (ต้องมี PIN)
+                 │ fetch POST {"fn","args"} text/plain (เขียนข้อมูล/ส่งไลน์ — ไม่มี PIN)
                  ▼
             Apps Script Web app /exec  (apps-script/Code.gs = JSON API)
                  │  ├─ Google Sheets  (ฐานข้อมูล 7 ชีต)
@@ -61,7 +61,7 @@ LINE ──webhook POST {destination,events}──► /exec เดียวก�
 
 | ชีต | คอลัมน์ | หมายเหตุ |
 |---|---|---|
-| `ตั้งค่า` | หัวข้อ, ค่า, คำอธิบาย | key: `ชื่อโรงเรียน`, `รหัส PIN` (ค่าเริ่ม 1234), `LINE groupId` (ระบบกรอกเอง), `ผู้จัดตารางสอนแทน`, `ข้อความท้ายประกาศไลน์` |
+| `ตั้งค่า` | หัวข้อ, ค่า, คำอธิบาย | key: `ชื่อโรงเรียน`, `LINE groupId` (ระบบกรอกเอง), `ผู้จัดตารางสอนแทน`, `ข้อความท้ายประกาศไลน์` |
 | `ครู` | ชื่อครู, ชื่อที่แสดง, กลุ่มสาระ/หน้าที่, LINE userId, ชื่อในไลน์, ใช้งาน | "ชื่อครู" คือ primary key (ใช้อ้างอิงทุกที่) |
 | `คาบเรียน` | คาบ, เริ่ม, สิ้นสุด | เวลาเก็บเป็นข้อความ `HH:mm` |
 | `ตารางสอน` | ชื่อครู, วัน, คาบ, วิชา, ห้อง | 1 แถว = 1 คาบ; วันรับ จันทร์/จ/จ./1 ฯลฯ (`normDay_`) |
@@ -80,14 +80,13 @@ Script Properties: `SS_ID`, `FOLDER_ID` (โฟลเดอร์ Drive "ภา�
 | `getInitData` | GET | – | ชื่อโรงเรียน, ครู, คาบ, เหตุผลการลา, วันนี้ (เวลาไทย), sheetUrl, webAppUrl |
 | `getDateData` | GET | `date` | ตารางสอนของวันนั้น, รายการสอนแทน, `monthCounts` (ไม่นับวันนั้น), ภาพล่าสุด |
 | `getStats` | GET | `yyyy-MM` | ภาระสอนแทนรายครู + รายวัน |
-| `verifyPin` | POST | `pin` | |
-| `saveDay` | POST | `pin, date, rows[]` | **แทนที่ทั้งวัน**, ตรวจชื่อครู/สอนแทนตัวเอง/ซ้ำคาบ, ใช้ LockService, ลบรายการภาพของวันนั้น |
-| `saveImageToDrive` | POST | `pin, date, dataUrl` | JPEG base64 → Drive แชร์ "ทุกคนที่มีลิงก์" → `lh3.googleusercontent.com/d/<id>` |
-| `sendToLine` | POST | `pin, date, dataUrl\|null` | push ภาพ + textV2 mention เข้ากลุ่ม; ถ้า dataUrl เป็น null ใช้ภาพล่าสุดใน Drive |
-| `getAdminData` | POST | `pin` | ข้อมูลบอท, โควตา, กลุ่ม, ครู+userId, สมาชิกไลน์ |
-| `saveLineToken` | POST | `pin, token` | ตรวจ token ด้วย `/v2/bot/info` ก่อนบันทึก, เก็บ `BOT_USER_ID` |
-| `linkTeacherLine` | POST | `pin, teacherName, userId` | ผูก/ยกเลิกผูกด้วยมือ |
-| `sendLineTest` | POST | `pin` | |
+| `saveDay` | POST | `date, rows[]` | **แทนที่ทั้งวัน**, ตรวจชื่อครู/สอนแทนตัวเอง/ซ้ำคาบ, ใช้ LockService, ลบรายการภาพของวันนั้น |
+| `saveImageToDrive` | POST | `date, dataUrl` | JPEG base64 → Drive แชร์ "ทุกคนที่มีลิงก์" → `lh3.googleusercontent.com/d/<id>` |
+| `sendToLine` | POST | `date, dataUrl\|null` | push ภาพ + textV2 mention เข้ากลุ่ม; ถ้า dataUrl เป็น null ใช้ภาพล่าสุดใน Drive |
+| `getAdminData` | POST | – | ข้อมูลบอท, โควตา, กลุ่ม, ครู+userId, สมาชิกไลน์ |
+| `saveLineToken` | POST | `token` | ตรวจ token ด้วย `/v2/bot/info` ก่อนบันทึก, เก็บ `BOT_USER_ID` |
+| `linkTeacherLine` | POST | `teacherName, userId` | ผูก/ยกเลิกผูกด้วยมือ |
+| `sendLineTest` | POST | – | |
 
 ถ้าเพิ่มฟังก์ชันใหม่: เพิ่มใน `GET_API`/`POST_API` (Code.gs) และถ้าเป็น GET ให้เพิ่มใน `GET_FUNCTIONS` (index.html) ด้วย
 
@@ -103,9 +102,9 @@ Script Properties: `SS_ID`, `FOLDER_ID` (โฟลเดอร์ Drive "ภา�
 
 ## หน้าเว็บ (index.html)
 
-- state กลางอยู่ใน `S` (`init`, `date`, `dd`, `plan`, `pin`, `dirty`, `img`, `imgDrive`); render ใหม่ทั้งรายการด้วย `render()` + event delegation
-- localStorage: `subpin` (PIN), `apiUrl` (URL /exec) — ห่อ try/catch แล้ว
-- แท็บ: จัดสอนแทน / สถิติ / ตั้งค่า, modal แบบ bottom sheet (เลือกครู, ภาพ, PIN)
+- state กลางอยู่ใน `S` (`init`, `date`, `dd`, `plan`, `dirty`, `img`, `imgDrive`); render ใหม่ทั้งรายการด้วย `render()` + event delegation
+- localStorage: `apiUrl` (URL /exec) — ห่อ try/catch แล้ว
+- แท็บ: จัดสอนแทน / สถิติ / ตั้งค่า, modal แบบ bottom sheet (เลือกครู, ภาพ)
 - **จัดอัตโนมัติ** (`autoAssign`): เรียงคาบจากเช้าไปเย็น เลือกครูว่างที่ `score` ต่ำสุด = สอนแทนเดือนนี้ + สอนแทนวันนี้×2 + คาบสอนเอง×0.3, เสมอกันให้กลุ่มสาระเดียวกับครูที่ลาก่อน
 - ครูว่าง (`candidates`) = ใช้งานอยู่ ∧ ไม่ได้ลา ∧ ไม่มีคาบตัวเองในคาบนั้น ∧ ยังไม่ถูกจัดคาบนั้น; `slotConflict` แสดงแถบแดง
 - **ภาพ** วาดด้วย canvas 1080px (`drawImage`), ตัดบรรทัดภาษาไทยด้วย `Intl.Segmenter('th')` (มี regex fallback), ฟอนต์ Sarabun จาก Google Fonts, ส่งออก JPEG 0.92
@@ -119,7 +118,7 @@ Script Properties: `SS_ID`, `FOLDER_ID` (โฟลเดอร์ Drive "ภา�
 - บัญชี Google Workspace ของโรงเรียนอาจห้ามแชร์ "ทุกคนที่มีลิงก์" → ภาพส่งไลน์ไม่ได้ แนะนำติดตั้งด้วย Gmail ส่วนตัว
 - วันที่/เวลาในชีตตั้ง number format เป็นข้อความ (`@`) ใน `setup()` เพื่อกัน Sheets แปลงเป็น Date; โค้ดอ่านด้วย `dateStr_`/`timeStr_` รองรับทั้งสองแบบ
 - เขตเวลา `Asia/Bangkok` ตายตัว (`TZ`); ปี พ.ศ. = ค.ศ. + 543
-- PIN เป็นรหัสร่วมตัวเดียวเก็บในชีต (plain text) และจำในเครื่องผู้ใช้; ใครมีลิงก์ดูข้อมูล GET ได้โดยไม่ต้องใช้ PIN; ยังไม่มีการจำกัดจำนวนครั้งที่ใส่ PIN ผิด
+- **ไม่มี PIN แล้ว (ผู้ใช้สั่งเอาออก 2026-11-12)** — ใครรู้ URL /exec อ่าน/เขียนข้อมูล ส่งไลน์ และเปลี่ยน LINE token ได้ทั้งหมด; ความลับเดียวคือ URL นั้น (หลุดแล้ว Deploy ใหม่เพื่อเปลี่ยน URL); ฟังก์ชัน `pinFail` ในหน้าเว็บเหลือแค่แสดง toast ผิดพลาด (ชื่อเก่า)
 - **ห้ามลบ `.nojekyll`** — ถ้าไม่มี GitHub Pages จะรัน Jekyll/Liquid กับไฟล์ `.md` (CLAUDE.md มี `{{`/`}}`) ซึ่งอาจทำให้ build เพี้ยนหรือล้ม
 - `ScriptApp.getService().getUrl()` อาจคืน URL อื่น (เช่น `/dev`) → ช่อง Webhook URL ในหน้าตั้งค่าจึงแสดง `apiUrl()` (URL /exec ที่หน้าเว็บเรียกอยู่จริง) ก่อน `webAppUrl`
 - sandbox ของ Claude เข้า `*.github.io` ไม่ได้ → ตรวจสถานะ GitHub Pages จริงเองไม่ได้ ต้องถามผู้ใช้
@@ -127,7 +126,7 @@ Script Properties: `SS_ID`, `FOLDER_ID` (โฟลเดอร์ Drive "ภา�
 ## การทดสอบ
 
 - `node tests/api.test.js` — ต้องผ่านทุกข้อก่อน commit การแก้ Code.gs
-- `node tests/e2e.test.js [โฟลเดอร์ภาพ]` — ทดสอบหน้าเว็บทั้ง flow (ตั้ง URL → เพิ่มครู → จัดอัตโนมัติ → PIN → ภาพ → LINE → สถิติ) บน viewport 390×844 กับ Code.gs จริง; ให้รันทุกครั้งที่แก้ index.html หรือ Code.gs ใส่โฟลเดอร์ภาพเพื่อดู `preview.jpg`/screenshot
+- `node tests/e2e.test.js [โฟลเดอร์ภาพ]` — ทดสอบหน้าเว็บทั้ง flow (ตั้ง URL → เพิ่มครู → จัดอัตโนมัติ → ภาพ → LINE → สถิติ) บน viewport 390×844 กับ Code.gs จริง; ให้รันทุกครั้งที่แก้ index.html หรือ Code.gs ใส่โฟลเดอร์ภาพเพื่อดู `preview.jpg`/screenshot
   - หน้าเว็บกับ API ใช้ http server ในเครื่องคนละ origin; API ตอบ 302 ไป `/macros/echo` แบบ Apps Script และตอบ OPTIONS ด้วย 405 (จับ CORS preflight ได้)
   - ใช้ server จริงแทน `page.route` เพราะ Playwright route **ไม่ดักคำขอที่ตามหลัง redirect** (คำขอ echo จะหลุดออกเน็ตแล้วล้ม)
   - "วันนี้" ของ backend ถูกตรึงเป็น 2026-09-28 (วันจันทร์) โดยแทน `todayStr_` ในเทสต์
@@ -139,8 +138,7 @@ Script Properties: `SS_ID`, `FOLDER_ID` (โฟลเดอร์ Drive "ภา�
 - ลบภาพเก่าใน Drive อัตโนมัติ (ตอนนี้ภาพถูกสร้างซ้ำทุกครั้งที่เปิดตัวอย่าง/ส่ง)
 - PWA (manifest + icon) ให้ "เพิ่มไปยังหน้าจอหลัก" สวยขึ้น
 - แจ้งเตือนส่วนตัว (push 1:1) ให้ครูที่ถูกจัด หรือส่งตอนเช้าอัตโนมัติด้วย time-driven trigger
-- PIN แยกรายผู้ใช้ / hash PIN
-- ล็อก PIN ชั่วคราวเมื่อใส่ผิดหลายครั้ง (CacheService) — ตอนนี้เดา PIN 4 หลักได้ไม่จำกัดถ้ารู้ URL /exec (ระวังข้อความล็อกอย่ามีคำว่า "PIN" เพราะ `pinFail` ฝั่งหน้าเว็บจะล้าง PIN ที่จำไว้)
+- ถ้าต้องการป้องกันกลับมา: รหัสผ่านร่วม/แยกรายผู้ใช้ (hash) + ล็อกชั่วคราวเมื่อใส่ผิดหลายครั้งด้วย CacheService
 - ลิงก์ตั้งค่า URL อัตโนมัติ (เช่น `…/teachtimetables/#api=<url>`) ให้ผู้ดูแลแชร์ในกลุ่มไลน์ แทนการให้แต่ละเครื่องวาง URL เอง และไม่ต้องฝัง URL ในหน้าเว็บสาธารณะ
 - นำเข้าตารางสอนจาก Excel
 
