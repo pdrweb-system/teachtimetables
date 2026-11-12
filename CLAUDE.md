@@ -36,6 +36,7 @@ LINE ──webhook POST {destination,events}──► /exec เดียวก�
 | `apps-script/Code.gs` | Backend JSON API + LINE webhook — **คัดลอกไปวางใน Apps Script เอง** (ไม่ได้ deploy อัตโนมัติจาก repo) |
 | `tests/gasmock.js` | Mock ของ SpreadsheetApp/DriveApp/UrlFetchApp/ฯลฯ ในหน่วยความจำ ให้รัน Code.gs ใน Node ได้ |
 | `tests/api.test.js` | ทดสอบ API ผ่าน doGet/doPost แบบเดียวกับที่ index.html เรียก — `node tests/api.test.js` |
+| `tests/flex.test.js` | ทดสอบคำสั่ง `แจ้งตารางสอนแทน` + ตัวตรวจ Flex (property/ค่า/ขนาด) — `node tests/flex.test.js [--dump]` |
 | `tests/e2e.test.js` | ทดสอบหน้าเว็บทั้ง flow ใน Chromium กับ Code.gs จริง — `node tests/e2e.test.js [โฟลเดอร์ภาพ]` |
 | `README.md` | คู่มือผู้ใช้ (ภาษาไทย) สำหรับสถาปัตยกรรมปัจจุบัน: ติดตั้ง, Deploy, GitHub Pages, LINE, อัปเดตจากเวอร์ชันเดิม, FAQ |
 | `.nojekyll` | ปิด Jekyll ของ GitHub Pages (ดูข้อควรระวัง) |
@@ -48,6 +49,7 @@ LINE ──webhook POST {destination,events}──► /exec เดียวก�
 - เวอร์ชันแรก (Apps Script HtmlService: `Code.gs` + `Index.html`) ทำครบทุกฟีเจอร์ ทดสอบด้วย mock แล้ว
 - แปลงเป็น GitHub Pages + API: `index.html` push ขึ้น repo แล้ว (commit `4cc1957`, 2026-09-27) — แทน `google.script.run` ด้วย `fetch()` และมีช่องกรอก URL API ในแท็บตั้งค่า
 - `apps-script/Code.gs` เวอร์ชัน API อยู่ในโฟลเดอร์นี้ ผ่าน `tests/api.test.js` 19 ข้อ (เวอร์ชันนี้สร้างใหม่ให้ตรงกับ index.html — **ถ้าใน Apps Script ของผู้ใช้มี Code.gs ที่แก้เองไว้ ให้เทียบกับตัวนั้นก่อนทับ**)
+- 2026-11-12: คำสั่งไลน์ `แจ้งตารางสอนแทน` → reply เป็น Flex message + แท็กชื่อ (Code.gs; `tests/flex.test.js` 32 ข้อ) — ต้องวาง Code.gs ใหม่แล้ว Deploy เวอร์ชันใหม่จึงจะใช้ได้
 - 2026-11-12: เอา PIN เดิมออก → แยก 2 หน้า (index.html ครู / admin.html ผู้ดูแลที่ต้องใส่รหัส ตรวจที่ Code.gs); เทสต์ API 36 ข้อ, e2e 32 ข้อ — **ต้องวาง Code.gs ใหม่แล้ว Deploy เวอร์ชันใหม่พร้อมกับ merge หน้าเว็บ และผู้ดูแลต้องตั้งรหัสที่ admin.html ทันที**
 - 2026-11-11 (branch `claude/upbeat-curie-mt0k04`): นำ `apps-script/`, `tests/`, `docs/`, `CLAUDE.md` เข้า repo; เพิ่ม `README.md` (คู่มือติดตั้งปัจจุบัน), `.nojekyll`, `tests/e2e.test.js` (ผ่าน 21 ข้อ); index.html: fetch ล้มเหลวแจ้งเป็นภาษาไทยพร้อมวิธีตรวจ (`netFail`), บันทึก URL แล้วแจ้ง "เชื่อมต่อสำเร็จ ✓", ช่อง Webhook URL ใช้ `apiUrl()` — Code.gs ไม่ได้แก้
 
@@ -100,7 +102,11 @@ Script Properties: `SS_ID`, `FOLDER_ID` (โฟลเดอร์ Drive "ภา�
 - ข้อความแท็กชื่อใช้ **Text message v2** (`type:"textV2"` + `substitution` แบบ `mention`) — placeholder `{t0}` ต้อง escape `{`/`}` ในข้อความอื่นเป็น `{{`/`}}` (ฟังก์ชัน `esc` ใน `buildLineMessage_`) ถ้าไม่มีใครแท็กได้จะส่ง `type:"text"` ธรรมดา
 - แท็กได้เฉพาะครูที่มี `LINE userId` — ได้จากคำสั่ง `ลงทะเบียน <ชื่อ>` ในกลุ่ม หรือผูกเองในหน้าตั้งค่า
 - **โควตา**: push เข้ากลุ่มนับตามจำนวนสมาชิกในกลุ่ม (แผนฟรีจำกัดต่อเดือน); **reply ฟรี** → คำสั่ง `สอนแทน`/`สอนแทนพรุ่งนี้` ในกลุ่มเป็นทางประหยัด (บอทตอบภาพ+แท็ก)
-- คำสั่งกลุ่ม: `สอนแทน`, `สอนแทนพรุ่งนี้`, `สอนแทนมะรืน`, `ลงทะเบียน ชื่อ`, `ตั้งกลุ่มนี้`, `คำสั่ง`
+- คำสั่งกลุ่ม: `แจ้งตารางสอนแทน[พรุ่งนี้|มะรืน]`, `สอนแทน`, `สอนแทนพรุ่งนี้`, `สอนแทนมะรืน`, `ลงทะเบียน ชื่อ`, `ตั้งกลุ่มนี้`, `คำสั่ง`
+- **`แจ้งตารางสอนแทน`** (`buildFlexMessage_` + `buildMentionNotice_`): reply = Flex ตาราง (bubble เดียว ≤ `FLEX.ROWS_PER_BUBBLE` = 15 คาบ, เกินนั้นเป็น carousel) + ในกลุ่มตามด้วย textV2 แท็กผู้สอนแทน (Flex ใส่ mention ไม่ได้; ไม่มีใครผูกไลน์ = ไม่ส่งข้อความที่สอง); แชต 1:1 ส่ง Flex อย่างเดียว
+  - ข้อจำกัด LINE: bubble ≤ 30 KB, carousel ≤ 12 bubble/≤ 50 KB (1 คาบ ≈ 1 KB → แสดงได้ราว 45 คาบ เกินนั้นตัดท้ายพร้อมข้อความ "…และอีก N คาบ"), text ห้ามว่าง, altText ≤ 1500
+  - ถ้า LINE ปฏิเสธ Flex จะ reply ซ้ำด้วยข้อความแบบเดิม (`buildLineMessage_`) — reply token ยังใช้ได้เมื่อคำขอแรกล้ม
+  - ไม่มีเครื่องมือ render Flex จริงใน sandbox (api.line.me ถูกบล็อก) — ตรวจด้วย `tests/flex.test.js`; ถ้าแก้หน้าตาให้ผู้ใช้ลองในกลุ่มจริง หรือวาง JSON จาก `--dump` ใน Flex Message Simulator ของ LINE
 - เชิญบอทเข้ากลุ่ม → event `join` ตั้ง `LINE groupId` อัตโนมัติ
 - Apps Script อ่าน HTTP header ไม่ได้ → **ตรวจ `X-Line-Signature` ไม่ได้**; กันด้วยการเทียบ `destination` กับ `BOT_USER_ID` เท่านั้น
 - ปุ่ม Verify ใน LINE Console มักขึ้น 302 (Apps Script redirect) — ปกติ ให้ทดสอบด้วยการพิมพ์ `คำสั่ง` ในกลุ่ม
@@ -131,7 +137,7 @@ Script Properties: `SS_ID`, `FOLDER_ID` (โฟลเดอร์ Drive "ภา�
 
 ## การทดสอบ
 
-- `node tests/api.test.js` — ต้องผ่านทุกข้อก่อน commit การแก้ Code.gs
+- `node tests/api.test.js` และ `node tests/flex.test.js` — ต้องผ่านทุกข้อก่อน commit การแก้ Code.gs
 - `node tests/e2e.test.js [โฟลเดอร์ภาพ]` — ทดสอบหน้าเว็บทั้ง flow (ตั้ง URL → เพิ่มครู → จัดอัตโนมัติ → ภาพ → หน้าผู้ดูแล: ตั้งรหัส/เข้า-ออก/เปลี่ยนรหัส/LINE → ส่งไลน์ → สถิติ) บน viewport 390×844 กับ Code.gs จริง; ให้รันทุกครั้งที่แก้ index.html หรือ Code.gs ใส่โฟลเดอร์ภาพเพื่อดู `preview.jpg`/screenshot
   - หน้าเว็บกับ API ใช้ http server ในเครื่องคนละ origin; API ตอบ 302 ไป `/macros/echo` แบบ Apps Script และตอบ OPTIONS ด้วย 405 (จับ CORS preflight ได้)
   - ใช้ server จริงแทน `page.route` เพราะ Playwright route **ไม่ดักคำขอที่ตามหลัง redirect** (คำขอ echo จะหลุดออกเน็ตแล้วล้ม)

@@ -44,7 +44,9 @@ const PROP = PropertiesService.getScriptProperties();
 
 const HELP_TEXT = [
   '🤖 คำสั่งบอทสอนแทน',
-  '• สอนแทน — ดูตารางสอนแทนวันนี้',
+  '• แจ้งตารางสอนแทน — ประกาศตารางสอนแทนวันนี้ (การ์ด + แท็กชื่อ)',
+  '• แจ้งตารางสอนแทนพรุ่งนี้ — ประกาศของวันพรุ่งนี้',
+  '• สอนแทน — ดูตารางสอนแทนวันนี้ (ภาพ + ข้อความ)',
   '• สอนแทนพรุ่งนี้ — ดูของวันพรุ่งนี้',
   '• ลงทะเบียน ชื่อ — ผูกไลน์กับชื่อครู เช่น ลงทะเบียน สมชาย',
   '• ตั้งกลุ่มนี้ — ใช้กลุ่มนี้รับประกาศสอนแทน',
@@ -542,6 +544,183 @@ function buildLineMessage_(dd, allowMention) {
   return { message: message, untagged: untagged };
 }
 
+// ───────────────────────── Flex message (คำสั่ง แจ้งตารางสอนแทน) ─────────────────────────
+// Flex แท็กชื่อไม่ได้ (mention มีเฉพาะใน textV2) → ตอบ Flex แล้วตามด้วยข้อความแท็กชื่อสั้น ๆ (buildMentionNotice_)
+// ข้อจำกัดของ LINE: bubble ≤ 30 KB, carousel ≤ 12 bubble และ ≤ 50 KB, altText ≤ 1500 ตัวอักษร, text ห้ามเป็นค่าว่าง
+const FLEX = {
+  ROWS_PER_BUBBLE: 15,
+  MAX_BUBBLES: 12,
+  MAX_BUBBLE_BYTES: 30000,
+  MAX_CAROUSEL_BYTES: 50000,
+  C: { pri: '#1f4e8c', pri2: '#2f74c0', head: '#1f3b63', ink: '#1c2533', muted: '#6b778a', ok: '#0b7a3e', err: '#c62828', line: '#e2e8f0' },
+};
+const DAY_WORDS = ['วันนี้', 'พรุ่งนี้', 'มะรืนนี้'];
+
+function dayOffset_(word) {
+  if (!word || word === 'วันนี้') return 0;
+  return word === 'พรุ่งนี้' ? 1 : 2;
+}
+
+function utf8Len_(s) {
+  let n = 0;
+  for (let i = 0; i < s.length; i++) {
+    const c = s.charCodeAt(i);
+    if (c < 0x80) n += 1;
+    else if (c < 0x800) n += 2;
+    else if (c >= 0xd800 && c <= 0xdbff) { n += 4; i++; }
+    else n += 3;
+  }
+  return n;
+}
+
+/** ตารางสอนแทนของวันเป็น Flex message (bubble เดียว หรือ carousel เมื่อคาบเยอะ) */
+function buildFlexMessage_(dd) {
+  const C = FLEX.C;
+  const st = settings_();
+  const tmap = {};
+  teachers_().forEach(function (t) { tmap[t.name] = t; });
+  const pmap = {};
+  periods_().forEach(function (p) { pmap[p.p] = p; });
+  const disp = function (n) { return (tmap[n] && tmap[n].display) || n; };
+  const txt = function (text, opt) { return Object.assign({ type: 'text', text: String(text), wrap: true }, opt || {}); };
+  const sep = { type: 'separator', color: C.line };
+
+  const slots = dd.subs.filter(function (s) { return s.period || s.subject; })
+    .sort(function (a, b) { return (a.period || 99) - (b.period || 99); });
+
+  const absents = [];
+  const seen = {};
+  dd.subs.forEach(function (s) {
+    if (seen[s.absent]) return;
+    seen[s.absent] = true;
+    absents.push(disp(s.absent) + (s.reason ? ' (' + s.reason + ')' : '') + (s.note ? ' — ' + s.note : ''));
+  });
+
+  const row = function (s) {
+    const p = pmap[s.period];
+    const where = [s.room, s.subject].filter(String).join(' ');
+    const info = [
+      txt(s.sub ? disp(s.sub) : 'ยังไม่มีผู้สอนแทน', { weight: 'bold', color: s.sub ? C.ok : C.err }),
+      txt('แทน ' + disp(s.absent) + (where ? ' · ' + where : ''), { size: 'sm', color: C.ink }),
+    ];
+    if (p) info.push(txt(p.start + '–' + p.end + ' น.', { size: 'xs', color: C.muted }));
+    return {
+      type: 'box', layout: 'horizontal', spacing: 'md',
+      contents: [
+        {
+          type: 'box', layout: 'vertical', flex: 0, width: '48px', cornerRadius: '8px', justifyContent: 'center',
+          paddingTop: '4px', paddingBottom: '6px', backgroundColor: s.sub ? C.pri : C.err,
+          contents: [
+            txt('คาบ', { size: 'xxs', color: '#ffffff', align: 'center', wrap: false }),
+            txt(s.period || '-', { size: 'lg', weight: 'bold', color: '#ffffff', align: 'center', wrap: false }),
+          ],
+        },
+        { type: 'box', layout: 'vertical', flex: 1, contents: info },
+      ],
+    };
+  };
+
+  const bubble = function (rows, part, total, first, last, hidden) {
+    const header = {
+      type: 'box', layout: 'vertical', spacing: 'xs', paddingAll: '16px',
+      background: { type: 'linearGradient', angle: '90deg', startColor: C.pri, endColor: C.pri2 },
+      contents: [
+        st[SET.SCHOOL] ? txt(st[SET.SCHOOL], { size: 'xs', color: '#ffffffcc' }) : null,
+        {
+          type: 'box', layout: 'horizontal', alignItems: 'center',
+          contents: [
+            txt('ตารางสอนแทน' + (total > 1 ? ' (' + part + '/' + total + ')' : ''), { size: 'xl', weight: 'bold', color: '#ffffff', flex: 1 }),
+            {
+              type: 'box', layout: 'vertical', flex: 0, cornerRadius: '14px', backgroundColor: '#ffffff33',
+              paddingStart: '10px', paddingEnd: '10px', paddingTop: '2px', paddingBottom: '2px',
+              contents: [txt(slots.length + ' คาบ', { size: 'sm', weight: 'bold', color: '#ffffff', wrap: false })],
+            },
+          ],
+        },
+        txt(dd.thaiDate, { size: 'sm', color: '#ffffff' }),
+      ].filter(Boolean),
+    };
+
+    const body = [];
+    if (first) {
+      body.push(txt('🙏 ครูที่ไม่อยู่', { size: 'sm', weight: 'bold', color: C.head }));
+      absents.forEach(function (a) { body.push(txt('• ' + a, { size: 'sm', color: C.ink })); });
+      body.push(Object.assign({ margin: 'md' }, sep));
+      body.push(txt('👩‍🏫 คาบที่ต้องสอนแทน', { size: 'sm', weight: 'bold', color: C.head }));
+      if (!slots.length) body.push(txt('(ไม่มีคาบที่ต้องสอนแทน)', { size: 'sm', color: C.muted }));
+    }
+    rows.forEach(function (s, i) {
+      if (i) body.push(sep);
+      body.push(row(s));
+    });
+    if (last && hidden) body.push(txt('…และอีก ' + hidden + ' คาบ (ดูครบในภาพตาราง)', { size: 'sm', color: C.err }));
+
+    const b = {
+      type: 'bubble', size: 'mega', header: header,
+      body: { type: 'box', layout: 'vertical', spacing: 'md', paddingAll: '16px', contents: body },
+    };
+    if (last) {
+      const foot = [];
+      if (dd.image) foot.push({ type: 'button', style: 'link', height: 'sm', action: { type: 'uri', label: '🖼️ ดูภาพตาราง', uri: dd.image.viewUrl } });
+      if (st[SET.FOOTER]) foot.push(txt(st[SET.FOOTER], { size: 'xs', color: C.muted }));
+      if (st[SET.SIGNER]) foot.push(txt('ผู้จัด: ' + st[SET.SIGNER], { size: 'xs', color: C.muted }));
+      if (foot.length) {
+        b.footer = { type: 'box', layout: 'vertical', spacing: 'sm', paddingAll: '12px', contents: foot };
+        b.styles = { footer: { separator: true } };
+      }
+    }
+    return b;
+  };
+
+  // แบ่งหน้าละ ROWS_PER_BUBBLE คาบ; ถ้าเกินขนาด/จำนวนที่ LINE รับได้ ให้ตัดคาบท้าย ๆ แล้วบอกว่ามีอีกกี่คาบ
+  const build = function (n) {
+    const pages = [];
+    for (let i = 0; i < n; i += FLEX.ROWS_PER_BUBBLE) pages.push(slots.slice(i, Math.min(i + FLEX.ROWS_PER_BUBBLE, n)));
+    if (!pages.length) pages.push([]);
+    const bubbles = pages.map(function (rows, i) {
+      return bubble(rows, i + 1, pages.length, i === 0, i === pages.length - 1, slots.length - n);
+    });
+    return bubbles.length === 1 ? bubbles[0] : { type: 'carousel', contents: bubbles };
+  };
+  const fits = function (c) {
+    const parts = c.type === 'carousel' ? c.contents : [c];
+    return parts.every(function (b) { return utf8Len_(JSON.stringify(b)) <= FLEX.MAX_BUBBLE_BYTES; }) &&
+      (c.type !== 'carousel' || utf8Len_(JSON.stringify(c)) <= FLEX.MAX_CAROUSEL_BYTES);
+  };
+  let n = Math.min(slots.length, FLEX.ROWS_PER_BUBBLE * FLEX.MAX_BUBBLES);
+  let contents = build(n);
+  while (n > 0 && !fits(contents)) contents = build(--n);
+
+  const subs = [];
+  slots.forEach(function (s) { if (s.sub && subs.indexOf(disp(s.sub)) < 0) subs.push(disp(s.sub)); });
+  const alt = '📋 ตารางสอนแทน ' + dd.thaiDate + ' — ' + slots.length + ' คาบ' + (subs.length ? ' · ผู้สอนแทน: ' + subs.join(', ') : '');
+  return { type: 'flex', altText: alt.length > 1500 ? alt.slice(0, 1499) + '…' : alt, contents: contents };
+}
+
+/** ข้อความสั้นแท็กชื่อผู้สอนแทน (ส่งตามหลัง Flex) — null ถ้าไม่มีใครผูกไลน์ไว้ */
+function buildMentionNotice_(dd, dayWord) {
+  const tmap = {};
+  teachers_().forEach(function (t) { tmap[t.name] = t; });
+  const names = [];
+  dd.subs.forEach(function (s) { if (s.sub && names.indexOf(s.sub) < 0) names.push(s.sub); });
+  if (!names.some(function (n) { return tmap[n] && tmap[n].userId; })) return null;
+  const esc = function (s) { return String(s).replace(/[{}]/g, function (c) { return c + c; }); };
+  const subst = {};
+  const parts = names.map(function (n, i) {
+    const t = tmap[n];
+    if (t && t.userId) {
+      subst['t' + i] = { type: 'mention', mentionee: { type: 'user', userId: t.userId } };
+      return '{t' + i + '}';
+    }
+    return esc((t && t.display) || n);
+  });
+  return {
+    type: 'textV2',
+    text: '📣 ' + parts.join(' ') + esc(' — มีคาบสอนแทน' + (dayWord || '') + ' ตามตารางด้านบน 🙏'),
+    substitution: subst,
+  };
+}
+
 // ───────────────────────── สถิติ ─────────────────────────
 function getStats(month) {
   month = str_(month);
@@ -827,9 +1006,31 @@ function handleText_(ev) {
     return;
   }
 
+  // แจ้งตารางสอนแทน [วันนี้|พรุ่งนี้|มะรืน] → reply (ฟรี) เป็น Flex + ข้อความแท็กชื่อผู้สอนแทน
+  m = text.match(/^แจ้งตารางสอนแทน ?(วันนี้|พรุ่งนี้|มะรืน(?:นี้)?)?$/);
+  if (m) {
+    const off = dayOffset_(m[1]);
+    const dd = getDateData(todayStr_(off));
+    if (!dd.subs.length) {
+      reply_(ev.replyToken, [{ type: 'text', text: 'ยังไม่มีการจัดสอนแทนของ' + dd.thaiDate }]);
+      return;
+    }
+    const msgs = [buildFlexMessage_(dd)];
+    const notice = inGroup ? buildMentionNotice_(dd, DAY_WORDS[off]) : null;
+    if (notice) msgs.push(notice);
+    try {
+      reply_(ev.replyToken, msgs);
+    } catch (err) {
+      // Flex ถูก LINE ปฏิเสธ (เช่น ข้อมูลยาวผิดปกติ) → ตอบเป็นข้อความธรรมดาแทน (reply token ยังใช้ได้เมื่อคำขอแรกล้ม)
+      console.error('Flex reply failed: ' + err.message);
+      reply_(ev.replyToken, [buildLineMessage_(dd, inGroup).message]);
+    }
+    return;
+  }
+
   m = text.match(/^สอนแทน ?(วันนี้|พรุ่งนี้|มะรืน(?:นี้)?)?$/);
   if (m) {
-    const off = !m[1] || m[1] === 'วันนี้' ? 0 : (m[1] === 'พรุ่งนี้' ? 1 : 2);
+    const off = dayOffset_(m[1]);
     const dd = getDateData(todayStr_(off));
     if (!dd.subs.length) {
       reply_(ev.replyToken, [{ type: 'text', text: 'ยังไม่มีการจัดสอนแทนของ' + dd.thaiDate }]);
