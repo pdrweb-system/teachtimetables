@@ -62,10 +62,15 @@ const GET_API = {
   getStats: function (month) { return getStats(month); },
 };
 
+// หน้าครู (index.html) ใช้: saveDay, saveImageToDrive, sendToLine — ไม่ต้องใช้รหัส
+// หน้าผู้ดูแล (admin.html) ใช้ที่เหลือ — ทุกตัวที่มี pw ต้องส่งรหัสผู้ดูแลเป็นอาร์กิวเมนต์แรก
 const POST_API = {
   saveDay: saveDay,
   saveImageToDrive: saveImageToDrive,
   sendToLine: sendToLine,
+  adminStatus: adminStatus,
+  setAdminPassword: setAdminPassword,
+  verifyAdmin: verifyAdmin,
   getAdminData: getAdminData,
   saveLineToken: saveLineToken,
   linkTeacherLine: linkTeacherLine,
@@ -317,8 +322,6 @@ function latestImage_(date) {
 // ───────────────────────── API สำหรับหน้าเว็บ ─────────────────────────
 function getInitData() {
   const st = settings_();
-  let webAppUrl = '';
-  try { webAppUrl = ScriptApp.getService().getUrl(); } catch (e) { /* ignore */ }
   return {
     school: st[SET.SCHOOL] || '',
     signer: st[SET.SIGNER] || '',
@@ -328,8 +331,6 @@ function getInitData() {
     periods: periods_(),
     reasons: REASONS,
     today: todayStr_(0),
-    sheetUrl: ss_().getUrl(),
-    webAppUrl: webAppUrl,
   };
 }
 
@@ -576,8 +577,56 @@ function getStats(month) {
   };
 }
 
-// ───────────────────────── ตั้งค่า LINE ─────────────────────────
-function getAdminData() {
+// ───────────────────────── รหัสผู้ดูแล (หน้าตั้งค่า) ─────────────────────────
+// เก็บเป็น SHA-256(salt:รหัส) ใน Script Properties (ADMIN_SALT / ADMIN_HASH) — ไม่เก็บรหัสจริง ไม่อยู่ในชีต
+// ใส่ผิดครบ ADMIN_MAX_FAILS ครั้ง ล็อก ADMIN_LOCK_SEC วินาที (นับรวมทุกคน เพราะแยกผู้ใช้ไม่ได้)
+const ADMIN_MAX_FAILS = 5;
+const ADMIN_LOCK_SEC = 900;
+const ADMIN_MIN_LEN = 6;
+
+function adminHash_(salt, pw) {
+  const bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, salt + ':' + pw, Utilities.Charset.UTF_8);
+  return bytes.map(function (b) { return ('0' + (b & 0xff).toString(16)).slice(-2); }).join('');
+}
+
+function adminGuard_(pw) {
+  const stored = PROP.getProperty('ADMIN_HASH');
+  if (!stored) throw new Error('ยังไม่ได้ตั้งรหัสผู้ดูแล');
+  const cache = CacheService.getScriptCache();
+  const fails = Number(cache.get('admin_fails')) || 0;
+  if (fails >= ADMIN_MAX_FAILS) throw new Error('ใส่รหัสผิดหลายครั้งเกินไป กรุณารอ ' + Math.round(ADMIN_LOCK_SEC / 60) + ' นาทีแล้วลองใหม่');
+  if (adminHash_(PROP.getProperty('ADMIN_SALT') || '', str_(pw)) !== stored) {
+    cache.put('admin_fails', String(fails + 1), ADMIN_LOCK_SEC);
+    throw new Error('รหัสผู้ดูแลไม่ถูกต้อง');
+  }
+  if (fails) cache.remove('admin_fails');
+}
+
+/** หน้าผู้ดูแลเรียกก่อนแสดงฟอร์ม: ตั้งรหัสแล้วหรือยัง */
+function adminStatus() { return { hasPassword: !!PROP.getProperty('ADMIN_HASH') }; }
+
+/** ตั้งรหัสครั้งแรก (ยังไม่มีรหัส) หรือเปลี่ยนรหัส (ต้องส่งรหัสเดิม) */
+function setAdminPassword(newPw, oldPw) {
+  newPw = str_(newPw);
+  if (newPw.length < ADMIN_MIN_LEN) throw new Error('รหัสผู้ดูแลต้องยาวอย่างน้อย ' + ADMIN_MIN_LEN + ' ตัวอักษร');
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    if (PROP.getProperty('ADMIN_HASH')) adminGuard_(oldPw);
+    const salt = Utilities.getUuid();
+    PROP.setProperty('ADMIN_SALT', salt);
+    PROP.setProperty('ADMIN_HASH', adminHash_(salt, newPw));
+  } finally {
+    lock.releaseLock();
+  }
+  return true;
+}
+
+function verifyAdmin(pw) { adminGuard_(pw); return true; }
+
+// ───────────────────────── ตั้งค่า LINE (ผู้ดูแลเท่านั้น) ─────────────────────────
+function getAdminData(pw) {
+  adminGuard_(pw);
   const st = settings_();
   const hasToken = !!PROP.getProperty('LINE_TOKEN');
   let bot = null;
@@ -593,7 +642,11 @@ function getAdminData() {
       quota = { type: q.type, limit: q.value, used: c.totalUsage };
     } catch (e) { /* ไม่แสดงโควตา */ }
   }
+  let webAppUrl = '';
+  try { webAppUrl = ScriptApp.getService().getUrl(); } catch (e) { /* ignore */ }
   return {
+    sheetUrl: ss_().getUrl(),
+    webAppUrl: webAppUrl,
     hasToken: hasToken,
     bot: bot,
     quota: quota,
@@ -607,7 +660,8 @@ function getAdminData() {
   };
 }
 
-function saveLineToken(token) {
+function saveLineToken(pw, token) {
+  adminGuard_(pw);
   token = str_(token);
   if (!token) throw new Error('กรุณาวาง Channel access token');
   const old = PROP.getProperty('LINE_TOKEN');
@@ -622,7 +676,8 @@ function saveLineToken(token) {
   }
 }
 
-function linkTeacherLine(teacherName, userId) {
+function linkTeacherLine(pw, teacherName, userId) {
+  adminGuard_(pw);
   const t = teachers_().filter(function (x) { return x.name === teacherName; })[0];
   if (!t) throw new Error('ไม่พบชื่อครู');
   userId = str_(userId);
@@ -635,7 +690,8 @@ function linkTeacherLine(teacherName, userId) {
   return true;
 }
 
-function sendLineTest() {
+function sendLineTest(pw) {
+  adminGuard_(pw);
   const groupId = settings_()[SET.GROUP];
   if (!groupId) throw new Error('ยังไม่ได้เชื่อมกลุ่มไลน์');
   lineApi_('/v2/bot/message/push', { to: groupId, messages: [{ type: 'text', text: '✅ ทดสอบระบบจัดสอนแทน — เชื่อมต่อกลุ่มสำเร็จ\n\n' + HELP_TEXT }] });

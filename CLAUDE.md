@@ -13,9 +13,9 @@
 ## สถาปัตยกรรม
 
 ```
-มือถือครู ──► GitHub Pages: index.html (UI ทั้งหมด, ไฟล์เดียว)
+ครู ──► GitHub Pages: index.html (หน้าจัดสอนแทน)   ผู้ดูแล ──► admin.html (ต้องใส่รหัสผู้ดูแล)
                  │ fetch GET  ?fn=&args=          (อ่านอย่างเดียว)
-                 │ fetch POST {"fn","args"} text/plain (เขียนข้อมูล/ส่งไลน์ — ไม่มี PIN)
+                 │ fetch POST {"fn","args"} text/plain (หน้าครู: ไม่ต้องใส่รหัส / admin: ส่ง pw ทุกครั้ง)
                  ▼
             Apps Script Web app /exec  (apps-script/Code.gs = JSON API)
                  │  ├─ Google Sheets  (ฐานข้อมูล 7 ชีต)
@@ -31,7 +31,8 @@ LINE ──webhook POST {destination,events}──► /exec เดียวก�
 
 | ไฟล์ | หน้าที่ |
 |---|---|
-| `index.html` | หน้าเว็บทั้งหมด (HTML+CSS+JS ไฟล์เดียว, ไม่มี build step) — ขึ้น GitHub Pages |
+| `index.html` | หน้าครู: จัดสอนแทน / สถิติ / เพิ่มเติม (HTML+CSS+JS ไฟล์เดียว, ไม่มี build step) — ขึ้น GitHub Pages |
+| `admin.html` | หน้าผู้ดูแล: เข้าสู่ระบบ/ตั้งรหัสครั้งแรก → LINE token, ผูกชื่อครู, เปลี่ยนรหัส (ไฟล์เดียว; โค้ด `run`/toast/loading ซ้ำกับ index.html — แก้ที่ใดต้องดูอีกที่ด้วย) |
 | `apps-script/Code.gs` | Backend JSON API + LINE webhook — **คัดลอกไปวางใน Apps Script เอง** (ไม่ได้ deploy อัตโนมัติจาก repo) |
 | `tests/gasmock.js` | Mock ของ SpreadsheetApp/DriveApp/UrlFetchApp/ฯลฯ ในหน่วยความจำ ให้รัน Code.gs ใน Node ได้ |
 | `tests/api.test.js` | ทดสอบ API ผ่าน doGet/doPost แบบเดียวกับที่ index.html เรียก — `node tests/api.test.js` |
@@ -47,6 +48,7 @@ LINE ──webhook POST {destination,events}──► /exec เดียวก�
 - เวอร์ชันแรก (Apps Script HtmlService: `Code.gs` + `Index.html`) ทำครบทุกฟีเจอร์ ทดสอบด้วย mock แล้ว
 - แปลงเป็น GitHub Pages + API: `index.html` push ขึ้น repo แล้ว (commit `4cc1957`, 2026-09-27) — แทน `google.script.run` ด้วย `fetch()` และมีช่องกรอก URL API ในแท็บตั้งค่า
 - `apps-script/Code.gs` เวอร์ชัน API อยู่ในโฟลเดอร์นี้ ผ่าน `tests/api.test.js` 19 ข้อ (เวอร์ชันนี้สร้างใหม่ให้ตรงกับ index.html — **ถ้าใน Apps Script ของผู้ใช้มี Code.gs ที่แก้เองไว้ ให้เทียบกับตัวนั้นก่อนทับ**)
+- 2026-11-12: เอา PIN เดิมออก → แยก 2 หน้า (index.html ครู / admin.html ผู้ดูแลที่ต้องใส่รหัส ตรวจที่ Code.gs); เทสต์ API 36 ข้อ, e2e 32 ข้อ — **ต้องวาง Code.gs ใหม่แล้ว Deploy เวอร์ชันใหม่พร้อมกับ merge หน้าเว็บ และผู้ดูแลต้องตั้งรหัสที่ admin.html ทันที**
 - 2026-11-11 (branch `claude/upbeat-curie-mt0k04`): นำ `apps-script/`, `tests/`, `docs/`, `CLAUDE.md` เข้า repo; เพิ่ม `README.md` (คู่มือติดตั้งปัจจุบัน), `.nojekyll`, `tests/e2e.test.js` (ผ่าน 21 ข้อ); index.html: fetch ล้มเหลวแจ้งเป็นภาษาไทยพร้อมวิธีตรวจ (`netFail`), บันทึก URL แล้วแจ้ง "เชื่อมต่อสำเร็จ ✓", ช่อง Webhook URL ใช้ `apiUrl()` — Code.gs ไม่ได้แก้
 
 **ยังต้องทำ (ขั้นตอนที่ผู้ใช้ทำเองในเบราว์เซอร์ — ยังไม่ยืนยันว่าทำแล้ว; วิธีทำละเอียดอยู่ใน README.md)**
@@ -69,7 +71,7 @@ LINE ──webhook POST {destination,events}──► /exec เดียวก�
 | `สมาชิกไลน์` | LINE userId, ชื่อในไลน์, groupId, พบล่าสุด | เก็บอัตโนมัติจาก webhook ทุกครั้งที่มีคนพิมพ์ในกลุ่ม |
 | `ภาพตารางสอนแทน` | วันที่, fileId, url, สร้างเมื่อ, ส่งไลน์เมื่อ | ภาพล่าสุดของวันใช้ตอบคำสั่ง `สอนแทน` |
 
-Script Properties: `SS_ID`, `FOLDER_ID` (โฟลเดอร์ Drive "ภาพตารางสอนแทน"), `LINE_TOKEN`, `BOT_USER_ID`
+Script Properties: `SS_ID`, `FOLDER_ID` (โฟลเดอร์ Drive "ภาพตารางสอนแทน"), `LINE_TOKEN`, `BOT_USER_ID`, `ADMIN_SALT` + `ADMIN_HASH` (SHA-256 ของ `salt:รหัส` — ลืมรหัสให้ลบสองตัวนี้แล้วตั้งใหม่ที่ admin.html)
 
 ## API contract (ต้องตรงกันทั้งสองฝั่ง)
 
@@ -77,16 +79,19 @@ Script Properties: `SS_ID`, `FOLDER_ID` (โฟลเดอร์ Drive "ภา�
 
 | ฟังก์ชัน | วิธี | args | หมายเหตุ |
 |---|---|---|---|
-| `getInitData` | GET | – | ชื่อโรงเรียน, ครู, คาบ, เหตุผลการลา, วันนี้ (เวลาไทย), sheetUrl, webAppUrl |
+| `getInitData` | GET | – | ชื่อโรงเรียน, ครู, คาบ, เหตุผลการลา, วันนี้ (เวลาไทย) — **ไม่มี sheetUrl/webAppUrl แล้ว** (ย้ายไป getAdminData) |
 | `getDateData` | GET | `date` | ตารางสอนของวันนั้น, รายการสอนแทน, `monthCounts` (ไม่นับวันนั้น), ภาพล่าสุด |
 | `getStats` | GET | `yyyy-MM` | ภาระสอนแทนรายครู + รายวัน |
 | `saveDay` | POST | `date, rows[]` | **แทนที่ทั้งวัน**, ตรวจชื่อครู/สอนแทนตัวเอง/ซ้ำคาบ, ใช้ LockService, ลบรายการภาพของวันนั้น |
 | `saveImageToDrive` | POST | `date, dataUrl` | JPEG base64 → Drive แชร์ "ทุกคนที่มีลิงก์" → `lh3.googleusercontent.com/d/<id>` |
 | `sendToLine` | POST | `date, dataUrl\|null` | push ภาพ + textV2 mention เข้ากลุ่ม; ถ้า dataUrl เป็น null ใช้ภาพล่าสุดใน Drive |
-| `getAdminData` | POST | – | ข้อมูลบอท, โควตา, กลุ่ม, ครู+userId, สมาชิกไลน์ |
-| `saveLineToken` | POST | `token` | ตรวจ token ด้วย `/v2/bot/info` ก่อนบันทึก, เก็บ `BOT_USER_ID` |
-| `linkTeacherLine` | POST | `teacherName, userId` | ผูก/ยกเลิกผูกด้วยมือ |
-| `sendLineTest` | POST | – | |
+| `adminStatus` | POST | – | `{hasPassword}` — หน้า admin ใช้เลือกว่าจะแสดงฟอร์มตั้งรหัสหรือเข้าสู่ระบบ |
+| `setAdminPassword` | POST | `newPw, oldPw?` | ยังไม่มีรหัส = ตั้งครั้งแรก (ใครก็ได้ — ผู้ดูแลต้องตั้งทันทีหลัง Deploy); มีแล้ว = ต้องส่ง oldPw; ยาว ≥ 6 |
+| `verifyAdmin` | POST | `pw` | |
+| `getAdminData` | POST | `pw` | ข้อมูลบอท, โควตา, กลุ่ม, ครู+userId, สมาชิกไลน์, sheetUrl, webAppUrl |
+| `saveLineToken` | POST | `pw, token` | ตรวจ token ด้วย `/v2/bot/info` ก่อนบันทึก, เก็บ `BOT_USER_ID` |
+| `linkTeacherLine` | POST | `pw, teacherName, userId` | ผูก/ยกเลิกผูกด้วยมือ |
+| `sendLineTest` | POST | `pw` | |
 
 ถ้าเพิ่มฟังก์ชันใหม่: เพิ่มใน `GET_API`/`POST_API` (Code.gs) และถ้าเป็น GET ให้เพิ่มใน `GET_FUNCTIONS` (index.html) ด้วย
 
@@ -104,7 +109,7 @@ Script Properties: `SS_ID`, `FOLDER_ID` (โฟลเดอร์ Drive "ภา�
 
 - state กลางอยู่ใน `S` (`init`, `date`, `dd`, `plan`, `dirty`, `img`, `imgDrive`); render ใหม่ทั้งรายการด้วย `render()` + event delegation
 - localStorage: `apiUrl` (URL /exec) — ห่อ try/catch แล้ว
-- แท็บ: จัดสอนแทน / สถิติ / ตั้งค่า, modal แบบ bottom sheet (เลือกครู, ภาพ)
+- แท็บ (index.html): จัดสอนแทน / สถิติ / เพิ่มเติม (URL API, โหลดข้อมูลใหม่, คำสั่งไลน์, ลิงก์ไป admin.html); modal แบบ bottom sheet (เลือกครู, ภาพ)
 - **จัดอัตโนมัติ** (`autoAssign`): เรียงคาบจากเช้าไปเย็น เลือกครูว่างที่ `score` ต่ำสุด = สอนแทนเดือนนี้ + สอนแทนวันนี้×2 + คาบสอนเอง×0.3, เสมอกันให้กลุ่มสาระเดียวกับครูที่ลาก่อน
 - ครูว่าง (`candidates`) = ใช้งานอยู่ ∧ ไม่ได้ลา ∧ ไม่มีคาบตัวเองในคาบนั้น ∧ ยังไม่ถูกจัดคาบนั้น; `slotConflict` แสดงแถบแดง
 - **ภาพ** วาดด้วย canvas 1080px (`drawImage`), ตัดบรรทัดภาษาไทยด้วย `Intl.Segmenter('th')` (มี regex fallback), ฟอนต์ Sarabun จาก Google Fonts, ส่งออก JPEG 0.92
@@ -118,7 +123,8 @@ Script Properties: `SS_ID`, `FOLDER_ID` (โฟลเดอร์ Drive "ภา�
 - บัญชี Google Workspace ของโรงเรียนอาจห้ามแชร์ "ทุกคนที่มีลิงก์" → ภาพส่งไลน์ไม่ได้ แนะนำติดตั้งด้วย Gmail ส่วนตัว
 - วันที่/เวลาในชีตตั้ง number format เป็นข้อความ (`@`) ใน `setup()` เพื่อกัน Sheets แปลงเป็น Date; โค้ดอ่านด้วย `dateStr_`/`timeStr_` รองรับทั้งสองแบบ
 - เขตเวลา `Asia/Bangkok` ตายตัว (`TZ`); ปี พ.ศ. = ค.ศ. + 543
-- **ไม่มี PIN แล้ว (ผู้ใช้สั่งเอาออก 2026-11-12)** — ใครรู้ URL /exec อ่าน/เขียนข้อมูล ส่งไลน์ และเปลี่ยน LINE token ได้ทั้งหมด; ความลับเดียวคือ URL นั้น (หลุดแล้ว Deploy ใหม่เพื่อเปลี่ยน URL); ฟังก์ชัน `pinFail` ในหน้าเว็บเหลือแค่แสดง toast ผิดพลาด (ชื่อเก่า)
+- **แบ่งสิทธิ์ 2 ระดับ (ผู้ใช้สั่ง 2026-11-12; PIN เดิมถูกเอาออก)**: หน้าครูไม่ใช้รหัส — ใครรู้ URL /exec อ่าน/แก้รายการสอนแทน/ส่งไลน์ได้; ฟังก์ชัน admin (`adminGuard_`) ตรวจรหัสที่เซิร์ฟเวอร์ทุกครั้ง, ใส่ผิด 5 ครั้งล็อก 15 นาทีด้วย CacheService (`admin_fails`, นับรวมทุกคน), อยู่ใน POST เท่านั้น (ไม่ผ่าน GET); รหัสเก็บฝั่งหน้าเว็บใน `sessionStorage` เฉพาะแท็บ (`adminpw`)
+- ข้อความ error รหัสผิดต้องมี "รหัสผู้ดูแลไม่ถูกต้อง" เพราะ `fail()` ใน admin.html ใช้ข้อความนี้ตัดสินว่าให้เด้งกลับหน้าเข้าสู่ระบบ (ข้อความล็อกจงใจไม่มีคำนี้)
 - **ห้ามลบ `.nojekyll`** — ถ้าไม่มี GitHub Pages จะรัน Jekyll/Liquid กับไฟล์ `.md` (CLAUDE.md มี `{{`/`}}`) ซึ่งอาจทำให้ build เพี้ยนหรือล้ม
 - `ScriptApp.getService().getUrl()` อาจคืน URL อื่น (เช่น `/dev`) → ช่อง Webhook URL ในหน้าตั้งค่าจึงแสดง `apiUrl()` (URL /exec ที่หน้าเว็บเรียกอยู่จริง) ก่อน `webAppUrl`
 - sandbox ของ Claude เข้า `*.github.io` ไม่ได้ → ตรวจสถานะ GitHub Pages จริงเองไม่ได้ ต้องถามผู้ใช้
@@ -126,7 +132,7 @@ Script Properties: `SS_ID`, `FOLDER_ID` (โฟลเดอร์ Drive "ภา�
 ## การทดสอบ
 
 - `node tests/api.test.js` — ต้องผ่านทุกข้อก่อน commit การแก้ Code.gs
-- `node tests/e2e.test.js [โฟลเดอร์ภาพ]` — ทดสอบหน้าเว็บทั้ง flow (ตั้ง URL → เพิ่มครู → จัดอัตโนมัติ → ภาพ → LINE → สถิติ) บน viewport 390×844 กับ Code.gs จริง; ให้รันทุกครั้งที่แก้ index.html หรือ Code.gs ใส่โฟลเดอร์ภาพเพื่อดู `preview.jpg`/screenshot
+- `node tests/e2e.test.js [โฟลเดอร์ภาพ]` — ทดสอบหน้าเว็บทั้ง flow (ตั้ง URL → เพิ่มครู → จัดอัตโนมัติ → ภาพ → หน้าผู้ดูแล: ตั้งรหัส/เข้า-ออก/เปลี่ยนรหัส/LINE → ส่งไลน์ → สถิติ) บน viewport 390×844 กับ Code.gs จริง; ให้รันทุกครั้งที่แก้ index.html หรือ Code.gs ใส่โฟลเดอร์ภาพเพื่อดู `preview.jpg`/screenshot
   - หน้าเว็บกับ API ใช้ http server ในเครื่องคนละ origin; API ตอบ 302 ไป `/macros/echo` แบบ Apps Script และตอบ OPTIONS ด้วย 405 (จับ CORS preflight ได้)
   - ใช้ server จริงแทน `page.route` เพราะ Playwright route **ไม่ดักคำขอที่ตามหลัง redirect** (คำขอ echo จะหลุดออกเน็ตแล้วล้ม)
   - "วันนี้" ของ backend ถูกตรึงเป็น 2026-09-28 (วันจันทร์) โดยแทน `todayStr_` ในเทสต์
@@ -138,7 +144,7 @@ Script Properties: `SS_ID`, `FOLDER_ID` (โฟลเดอร์ Drive "ภา�
 - ลบภาพเก่าใน Drive อัตโนมัติ (ตอนนี้ภาพถูกสร้างซ้ำทุกครั้งที่เปิดตัวอย่าง/ส่ง)
 - PWA (manifest + icon) ให้ "เพิ่มไปยังหน้าจอหลัก" สวยขึ้น
 - แจ้งเตือนส่วนตัว (push 1:1) ให้ครูที่ถูกจัด หรือส่งตอนเช้าอัตโนมัติด้วย time-driven trigger
-- ถ้าต้องการป้องกันกลับมา: รหัสผ่านร่วม/แยกรายผู้ใช้ (hash) + ล็อกชั่วคราวเมื่อใส่ผิดหลายครั้งด้วย CacheService
+- รหัสแยกรายผู้ใช้ (ตอนนี้รหัสผู้ดูแลเป็นรหัสเดียว) หรือใส่รหัสให้หน้าครูด้วยถ้าต้องการกัน URL หลุด
 - ลิงก์ตั้งค่า URL อัตโนมัติ (เช่น `…/teachtimetables/#api=<url>`) ให้ผู้ดูแลแชร์ในกลุ่มไลน์ แทนการให้แต่ละเครื่องวาง URL เอง และไม่ต้องฝัง URL ในหน้าเว็บสาธารณะ
 - นำเข้าตารางสอนจาก Excel
 

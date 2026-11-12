@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>ผู้ดูแลระบบ — ระบบจัดสอนแทน</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f2f5fa; --card: #ffffff; --ink: #1c2533; --muted: #6b778a; --line: #e2e8f0;
+    --pri: #1f4e8c; --pri2: #2f74c0; --ok: #0b7a3e; --okbg: #e8f6ee; --warn: #b45309; --warnbg: #fff4e0;
+    --err: #c62828; --errbg: #fdecec; --radius: 14px;
+    --safe-b: env(safe-area-inset-bottom, 0px);
+    color-scheme: light;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; background: var(--bg); color: var(--ink); }
+  body { font-family: 'Sarabun', 'Noto Sans Thai', Tahoma, sans-serif; font-size: 16px; line-height: 1.45; }
+  button, input, select { font: inherit; color: inherit; }
+  .wrap { max-width: 640px; margin: 0 auto; padding: 0 12px calc(150px + var(--safe-b)); }
+
+  header.top { background: linear-gradient(90deg, var(--pri), var(--pri2)); color: #fff; padding: 14px 16px 16px; }
+  header.top .in { max-width: 640px; margin: 0 auto; }
+  header.top h1 { margin: 0; font-size: 21px; font-weight: 700; }
+  header.top .school { opacity: .85; font-size: 14px; }
+
+  .card { background: var(--card); border-radius: var(--radius); padding: 14px; margin-top: 12px; box-shadow: 0 1px 2px rgba(20,40,80,.06); }
+  .card-h { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+  .card-h h2 { margin: 0; font-size: 17px; }
+  .muted { color: var(--muted); }
+  .small { font-size: 13.5px; }
+  .row { display: flex; gap: 8px; align-items: center; }
+  .grow { flex: 1; min-width: 0; }
+
+  input[type=date], input[type=month], input[type=text], input[type=password], input[type=number], select {
+    width: 100%; min-height: 44px; padding: 8px 10px; border: 1px solid #cfd8e3; border-radius: 10px; background: #fff;
+  }
+  select { appearance: none; -webkit-appearance: none; padding-right: 30px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236b778a' stroke-width='2' fill='none'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 10px center; }
+  input:focus, select:focus { outline: 2px solid #9cc1f0; border-color: var(--pri2); }
+
+  .btn { min-height: 46px; border: 0; border-radius: 12px; padding: 0 16px; font-weight: 600; cursor: pointer; }
+  .btn.pri { background: var(--pri); color: #fff; }
+  .btn.ok { background: #06c755; color: #fff; }
+  .btn.ghost { background: #e8eef7; color: var(--pri); }
+  .btn.line { background: #fff; border: 1px solid #cfd8e3; }
+  .btn.sm { min-height: 36px; padding: 0 12px; font-size: 14.5px; border-radius: 10px; }
+  .btn:disabled { opacity: .5; }
+  .btn.block { width: 100%; }
+  .icon-btn { width: 36px; height: 36px; border-radius: 10px; border: 0; background: #f1f4f9; color: var(--muted); font-size: 18px; cursor: pointer; }
+  .link { background: none; border: 0; color: var(--pri2); font-weight: 600; padding: 8px 0; cursor: pointer; }
+
+  .daynav button { width: 46px; flex: none; }
+  .dayname { margin-top: 8px; font-weight: 600; }
+
+  .empty { text-align: center; color: var(--muted); padding: 22px 8px; }
+  .acard { border: 1px solid var(--line); border-radius: 12px; padding: 12px; margin-top: 10px; }
+  .acard-h { display: flex; justify-content: space-between; gap: 8px; align-items: flex-start; }
+  .aname { font-weight: 700; font-size: 17px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1.3fr; gap: 8px; margin-top: 10px; }
+  .slot { border-radius: 10px; padding: 10px; margin-top: 10px; background: var(--warnbg); border-left: 4px solid #f59e0b; }
+  .slot.ok { background: var(--okbg); border-left-color: var(--ok); }
+  .slot.bad { background: var(--errbg); border-left-color: var(--err); }
+  .slot-h { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .pbadge { background: var(--pri); color: #fff; border-radius: 8px; padding: 1px 9px; font-weight: 600; font-size: 14px; }
+  .ptime { color: var(--muted); font-size: 14px; }
+  .slot-info { font-size: 15px; margin-bottom: 6px; }
+  .custom-grid { display: grid; grid-template-columns: 90px 1fr 1fr; gap: 6px; margin-bottom: 6px; }
+  .custom-grid input, .custom-grid select { min-height: 40px; }
+  .tag { display: inline-block; font-size: 12.5px; padding: 0 7px; border-radius: 6px; background: #eef2f7; color: var(--muted); }
+
+  .actionbar { position: fixed; left: 0; right: 0; bottom: calc(62px + var(--safe-b)); z-index: 20; }
+  .actionbar .in { max-width: 640px; margin: 0 auto; padding: 8px 12px; background: rgba(242,245,250,.95); backdrop-filter: blur(6px); }
+  .progress { font-size: 13.5px; color: var(--muted); margin-bottom: 6px; text-align: center; }
+  .progress b { color: var(--ink); }
+  .actionbar .row .btn { flex: 1; white-space: nowrap; padding: 0 10px; }
+  .actionbar .row #autoBtn { flex: 0 0 auto; }
+
+  nav.tabbar { position: fixed; left: 0; right: 0; bottom: 0; background: #fff; border-top: 1px solid var(--line); z-index: 21; padding-bottom: var(--safe-b); }
+  nav.tabbar .in { max-width: 640px; margin: 0 auto; display: flex; }
+  nav.tabbar button { flex: 1; height: 62px; border: 0; background: none; color: var(--muted); font-size: 13px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; cursor: pointer; }
+  nav.tabbar button .ic { font-size: 21px; line-height: 1; }
+  nav.tabbar button.on { color: var(--pri); font-weight: 700; }
+  .tab { display: none; }
+  .tab.on { display: block; }
+
+  .modal { position: fixed; inset: 0; background: rgba(15,25,40,.55); z-index: 50; display: none; align-items: flex-end; justify-content: center; }
+  .modal.on { display: flex; }
+  .sheet { background: #fff; width: 100%; max-width: 640px; max-height: 92vh; border-radius: 18px 18px 0 0; display: flex; flex-direction: column; padding-bottom: var(--safe-b); }
+  .sheet-h { padding: 14px 16px 8px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .sheet-h h3 { margin: 0; font-size: 18px; }
+  .sheet-b { padding: 0 16px 12px; overflow-y: auto; }
+  .sheet-f { padding: 10px 16px 14px; border-top: 1px solid var(--line); display: grid; gap: 8px; }
+  .plist button { width: 100%; text-align: left; border: 0; border-bottom: 1px solid var(--line); background: none; padding: 12px 4px; cursor: pointer; display: flex; justify-content: space-between; gap: 8px; }
+  .plist button:disabled { opacity: .4; }
+  #previewImg { width: 100%; border-radius: 10px; border: 1px solid var(--line); display: block; -webkit-touch-callout: default; }
+
+  .stat { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+  .stat:last-child { border: 0; }
+  .bar { height: 8px; background: #e8eef7; border-radius: 6px; overflow: hidden; margin-top: 4px; }
+  .bar i { display: block; height: 100%; background: var(--pri2); border-radius: 6px; }
+  .num { font-weight: 700; font-size: 18px; min-width: 36px; text-align: right; }
+  .dateitem { width: 100%; text-align: left; border: 0; background: #f6f8fb; border-radius: 10px; padding: 10px 12px; margin-top: 8px; cursor: pointer; }
+
+  .kv { display: grid; grid-template-columns: 110px 1fr; gap: 6px 10px; font-size: 15px; }
+  .pill { display: inline-block; border-radius: 999px; padding: 1px 10px; font-size: 13px; font-weight: 600; }
+  .pill.ok { background: var(--okbg); color: var(--ok); }
+  .pill.no { background: var(--errbg); color: var(--err); }
+  .linkrow { padding: 8px 0; border-bottom: 1px solid var(--line); }
+  .linkrow:last-child { border: 0; }
+  code.cmd { background: #eef2f7; border-radius: 6px; padding: 1px 6px; font-family: inherit; font-weight: 600; }
+
+  #toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(150px + var(--safe-b)); background: #1c2533; color: #fff; padding: 10px 16px; border-radius: 12px; z-index: 80; max-width: 92vw; text-align: center; opacity: 0; pointer-events: none; transition: opacity .2s; font-size: 15px; }
+  #toast.on { opacity: 1; }
+  #toast.err { background: var(--err); }
+  #loading { position: fixed; inset: 0; background: rgba(255,255,255,.7); z-index: 90; display: none; align-items: center; justify-content: center; flex-direction: column; gap: 10px; }
+  #loading.on { display: flex; }
+  .spin { width: 38px; height: 38px; border: 4px solid #d6e2f3; border-top-color: var(--pri); border-radius: 50%; animation: sp 0.8s linear infinite; }
+  @keyframes sp { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+<header class="top"><div class="in"><h1>🔒 ผู้ดูแลระบบ</h1><div class="school" id="schoolName">ระบบจัดสอนแทน</div></div></header>
+
+<div class="wrap" style="padding-bottom:40px">
+  <div class="card"><a class="link" href="index.html">‹ กลับหน้าจัดสอนแทน</a></div>
+
+  <!-- ยังไม่ตั้ง URL ของ API -->
+  <div class="card" id="urlBox" style="display:none">
+    <div class="card-h"><h2>การเชื่อมต่อ API</h2></div>
+    <div class="muted small">วาง URL ของ Apps Script (ลงท้ายด้วย /exec)</div>
+    <div class="row" style="margin-top:10px">
+      <input type="text" id="apiUrlInput" class="grow" placeholder="https://script.google.com/macros/s/xxxx/exec" autocomplete="off">
+      <button class="btn sm pri" id="apiUrlSaveBtn">บันทึก</button>
+    </div>
+  </div>
+
+  <!-- ตั้งรหัสครั้งแรก -->
+  <div class="card" id="setupBox" style="display:none">
+    <div class="card-h"><h2>ตั้งรหัสผู้ดูแล</h2></div>
+    <div class="muted small">ยังไม่เคยตั้งรหัส — ตั้งเดี๋ยวนี้ <b>ก่อนแจก URL ให้ใคร</b> (อย่างน้อย 6 ตัวอักษร) รหัสนี้ใช้เข้าหน้านี้เท่านั้น ครูไม่ต้องใช้</div>
+    <input type="password" id="newPw" placeholder="รหัสผู้ดูแลใหม่" autocomplete="new-password" style="margin-top:10px">
+    <input type="password" id="newPw2" placeholder="พิมพ์รหัสซ้ำอีกครั้ง" autocomplete="new-password" style="margin-top:8px">
+    <button class="btn pri block" id="setupBtn" style="margin-top:10px">ตั้งรหัสและเข้าสู่ระบบ</button>
+  </div>
+
+  <!-- เข้าสู่ระบบ -->
+  <div class="card" id="loginBox" style="display:none">
+    <div class="card-h"><h2>เข้าสู่ระบบผู้ดูแล</h2></div>
+    <input type="password" id="loginPw" placeholder="รหัสผู้ดูแล" autocomplete="current-password">
+    <button class="btn pri block" id="loginBtn" style="margin-top:10px">เข้าสู่ระบบ</button>
+    <div class="muted small" style="margin-top:8px">ลืมรหัส: ใน Apps Script เปิด “การตั้งค่าโปรเจกต์ → คุณสมบัติของสคริปต์” แล้วลบ ADMIN_HASH และ ADMIN_SALT จากนั้นเปิดหน้านี้ใหม่เพื่อตั้งรหัสใหม่</div>
+  </div>
+
+  <!-- ส่วนผู้ดูแล (แสดงหลังเข้าสู่ระบบ) -->
+  <div id="adminBox" style="display:none">
+    <div class="card">
+      <div class="card-h"><h2>ข้อมูลครูและตารางสอน</h2></div>
+      <div class="muted small">แก้รายชื่อครู คาบเรียน ตารางสอน และข้อความตั้งค่า (ชื่อโรงเรียน ผู้จัด ข้อความท้ายประกาศ) ได้ใน Google Sheet แล้วให้ครูกด “โหลดข้อมูลใหม่” ในหน้าจัดสอนแทน</div>
+      <button class="btn line block" id="openSheetBtn" style="margin-top:10px">เปิด Google Sheet</button>
+    </div>
+
+    <div class="card">
+      <div class="card-h"><h2>เชื่อมต่อ LINE</h2></div>
+      <div id="lineBox"><div class="muted small">กำลังโหลด…</div></div>
+    </div>
+
+    <div class="card">
+      <div class="card-h"><h2>เปลี่ยนรหัสผู้ดูแล</h2></div>
+      <input type="password" id="oldPw" placeholder="รหัสเดิม" autocomplete="current-password">
+      <input type="password" id="chPw" placeholder="รหัสใหม่ (อย่างน้อย 6 ตัวอักษร)" autocomplete="new-password" style="margin-top:8px">
+      <input type="password" id="chPw2" placeholder="พิมพ์รหัสใหม่ซ้ำ" autocomplete="new-password" style="margin-top:8px">
+      <button class="btn line block" id="changePwBtn" style="margin-top:10px">เปลี่ยนรหัส</button>
+    </div>
+
+    <div class="card"><button class="btn line block" id="logoutBtn">ออกจากระบบผู้ดูแล</button></div>
+  </div>
+</div>
+
+<div id="toast"></div>
+<div id="loading"><div class="spin"></div><div id="loadingText">กำลังโหลด…</div></div>
+
+<script>
+/* ═══════════════ ส่วนกลาง (ชุดเดียวกับ index.html) ═══════════════ */
+// ใช้ URL เดียวกับหน้าจัดสอนแทน (localStorage ของเว็บเดียวกันใช้ร่วมกัน)
+var APPS_SCRIPT_URL = '';
+var ADMIN = { pw: '', init: null, data: null };
+
+function $(s) { return document.querySelector(s); }
+function h(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+function errMsg(e) { return (e && (e.message || e)) + ''; }
+function store(k, v) { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) {} }
+function load(k) { try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } }
+function apiUrl() { return APPS_SCRIPT_URL || load('apiUrl'); }
+
+// รหัสผู้ดูแลจำเฉพาะแท็บนี้ (sessionStorage) — ปิดแท็บ/เบราว์เซอร์แล้วต้องใส่ใหม่
+function saveSession(v) { try { if (v == null) sessionStorage.removeItem('adminpw'); else sessionStorage.setItem('adminpw', v); } catch (e) {} }
+function loadSession() { try { return sessionStorage.getItem('adminpw') || ''; } catch (e) { return ''; } }
+
+// ทุกฟังก์ชันของหน้านี้เป็น POST (ไม่ตั้ง Content-Type เพื่อเลี่ยง CORS preflight — ดู index.html)
+function run(fn) {
+  var args = Array.prototype.slice.call(arguments, 1);
+  var base = apiUrl();
+  if (!base) return Promise.reject(new Error('ยังไม่ได้ตั้งค่า URL ของ Apps Script'));
+  return fetch(base, { method: 'POST', body: JSON.stringify({ fn: fn, args: args }) }).then(function (res) {
+    return res.text().then(function (t) {
+      try { return JSON.parse(t); }
+      catch (e) { throw new Error('เชื่อมต่อ API ไม่สำเร็จ (คำตอบไม่ใช่ JSON) — ตรวจสอบ URL และการ Deploy'); }
+    });
+  }, function () {
+    throw new Error('เชื่อมต่อ Apps Script ไม่ได้ — ตรวจสอบอินเทอร์เน็ตและ URL (ต้องลงท้ายด้วย /exec และ Deploy โดยให้ “ทุกคน” เข้าถึงได้)');
+  }).then(function (json) {
+    if (json && json.ok) return json.result;
+    throw new Error((json && json.error) || 'เกิดข้อผิดพลาดไม่ทราบสาเหตุ');
+  });
+}
+
+var toastTimer;
+function toast(msg, isErr) {
+  var t = $('#toast');
+  t.textContent = msg;
+  t.className = 'on' + (isErr ? ' err' : '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function () { t.className = ''; }, isErr ? 5000 : 2800);
+}
+function loading(on, text) {
+  $('#loadingText').textContent = text || 'กำลังโหลด…';
+  $('#loading').classList.toggle('on', !!on);
+}
+function show(id, on) { $(id).style.display = on ? '' : 'none'; }
+
+/* ═══════════════ สถานะหน้า: ตั้ง URL → ตั้งรหัส → เข้าสู่ระบบ → ผู้ดูแล ═══════════════ */
+function showOnly(which) {
+  ['urlBox', 'setupBox', 'loginBox', 'adminBox'].forEach(function (id) { show('#' + id, id === which); });
+}
+
+function boot() {
+  $('#apiUrlInput').value = apiUrl();
+  if (!apiUrl()) { showOnly('urlBox'); return; }
+  loading(true, 'กำลังเชื่อมต่อ…');
+  run('adminStatus').then(function (st) {
+    loading(false);
+    if (!st.hasPassword) { showOnly('setupBox'); return; }
+    var saved = loadSession();
+    if (saved) { return enter(saved, true); }
+    showOnly('loginBox');
+  }).catch(function (e) { loading(false); showOnly('urlBox'); toast(errMsg(e), true); });
+}
+
+// เข้าหน้าผู้ดูแลด้วยรหัสที่ให้มา (ตรวจกับเซิร์ฟเวอร์ทุกครั้ง)
+function enter(pw, silent) {
+  loading(true, 'กำลังตรวจสอบ…');
+  return run('getAdminData', pw).then(function (d) {
+    ADMIN.pw = pw; saveSession(pw);
+    showOnly('adminBox');
+    renderLine(d);
+    loading(false);
+    if (!silent) toast('เข้าสู่ระบบแล้ว ✓');
+  }).catch(function (e) {
+    loading(false);
+    ADMIN.pw = ''; saveSession(null);
+    showOnly('loginBox');
+    toast(errMsg(e), true);
+  });
+}
+
+// ข้อผิดพลาดหลังเข้าสู่ระบบแล้ว: ถ้ารหัสใช้ไม่ได้แล้ว (เช่น ถูกเปลี่ยนจากเครื่องอื่น) ให้กลับไปหน้าเข้าสู่ระบบ
+function fail(e) {
+  var m = errMsg(e);
+  if (m.indexOf('รหัสผู้ดูแลไม่ถูกต้อง') >= 0) { ADMIN.pw = ''; saveSession(null); showOnly('loginBox'); }
+  toast(m, true);
+}
+
+$('#apiUrlSaveBtn').onclick = function () {
+  var v = $('#apiUrlInput').value.trim();
+  if (v && !/^https:\/\/script\.google\.com\/macros\/s\/.+\/exec$/.test(v)) {
+    if (!confirm('URL นี้ไม่เหมือนรูปแบบปกติของ Apps Script Web app (…/exec) ต้องการบันทึกต่อหรือไม่?')) return;
+  }
+  store('apiUrl', v);
+  boot();
+};
+
+$('#setupBtn').onclick = function () {
+  var a = $('#newPw').value, b = $('#newPw2').value;
+  if (a.length < 6) { toast('รหัสต้องยาวอย่างน้อย 6 ตัวอักษร', true); return; }
+  if (a !== b) { toast('รหัสที่พิมพ์ซ้ำไม่ตรงกัน', true); return; }
+  loading(true, 'กำลังตั้งรหัส…');
+  run('setAdminPassword', a).then(function () { $('#newPw').value = ''; $('#newPw2').value = ''; return enter(a); })
+    .catch(function (e) { loading(false); toast(errMsg(e), true); });
+};
+
+$('#loginBtn').onclick = function () {
+  var pw = $('#loginPw').value;
+  if (!pw) return;
+  enter(pw).then(function () { $('#loginPw').value = ''; });
+};
+$('#loginPw').addEventListener('keydown', function (e) { if (e.key === 'Enter') $('#loginBtn').click(); });
+
+$('#logoutBtn').onclick = function () { ADMIN.pw = ''; saveSession(null); $('#lineBox').innerHTML = ''; showOnly('loginBox'); toast('ออกจากระบบแล้ว'); };
+
+$('#changePwBtn').onclick = function () {
+  var o = $('#oldPw').value, a = $('#chPw').value, b = $('#chPw2').value;
+  if (!o || !a) { toast('กรอกรหัสเดิมและรหัสใหม่', true); return; }
+  if (a.length < 6) { toast('รหัสใหม่ต้องยาวอย่างน้อย 6 ตัวอักษร', true); return; }
+  if (a !== b) { toast('รหัสใหม่ที่พิมพ์ซ้ำไม่ตรงกัน', true); return; }
+  loading(true, 'กำลังบันทึก…');
+  run('setAdminPassword', a, o).then(function () {
+    ADMIN.pw = a; saveSession(a);
+    $('#oldPw').value = ''; $('#chPw').value = ''; $('#chPw2').value = '';
+    toast('เปลี่ยนรหัสแล้ว ✓');
+  }).catch(fail).then(function () { loading(false); });
+};
+
+$('#openSheetBtn').onclick = function () { if (ADMIN.data && ADMIN.data.sheetUrl) window.open(ADMIN.data.sheetUrl, '_blank'); };
+
+/* ═══════════════ เชื่อมต่อ LINE ═══════════════ */
+$('#lineBox').addEventListener('click', function (e) {
+  var b = e.target.closest('button');
+  if (!b) return;
+  if (b.id === 'loadLineBtn') loadLine();
+  else if (b.id === 'saveTokenBtn') saveToken();
+  else if (b.id === 'testLineBtn') testLine();
+});
+$('#lineBox').addEventListener('change', function (e) {
+  var el = e.target;
+  if (!el.hasAttribute('data-teacher')) return;
+  loading(true, 'กำลังบันทึก…');
+  run('linkTeacherLine', ADMIN.pw, el.getAttribute('data-teacher'), el.value).then(function () {
+    toast(el.value ? 'ผูกไลน์แล้ว ✓' : 'ยกเลิกการผูกแล้ว');
+    return run('getAdminData', ADMIN.pw).then(renderLine);
+  }).catch(fail).then(function () { loading(false); });
+});
+
+function loadLine() {
+  loading(true);
+  run('getAdminData', ADMIN.pw).then(renderLine).catch(fail).then(function () { loading(false); });
+}
+
+function renderLine(d) {
+  ADMIN.data = d;
+  var linked = d.teachers.filter(function (t) { return t.userId; }).length;
+  var memberOpts = function (cur) {
+    var has = false;
+    var o = '<option value="">— ยังไม่ผูก —</option>' + d.members.map(function (m) {
+      if (m.userId === cur) has = true;
+      return '<option value="' + h(m.userId) + '"' + (m.userId === cur ? ' selected' : '') + '>' + h(m.name) + '</option>';
+    }).join('');
+    if (cur && !has) o += '<option value="' + h(cur) + '" selected>(ผูกไว้แล้ว)</option>';
+    return o;
+  };
+  var html = '<div class="kv">' +
+    '<div class="muted">บอท</div><div>' + (d.bot ? (d.bot.error ? '<span class="pill no">ผิดพลาด</span> ' + h(d.bot.error) : '<b>' + h(d.bot.name) + '</b> <span class="muted small">' + h(d.bot.basicId || '') + '</span>') : '<span class="pill no">ยังไม่ใส่ Token</span>') + '</div>' +
+    '<div class="muted">กลุ่มไลน์</div><div>' + (d.groupId ? '<span class="pill ok">เชื่อมแล้ว</span>' : '<span class="pill no">ยังไม่เชื่อม</span> <span class="small muted">เชิญบอทเข้ากลุ่ม</span>') + '</div>' +
+    (d.quota ? '<div class="muted">โควตาเดือนนี้</div><div>ใช้ไป ' + d.quota.used + (d.quota.type === 'limited' ? ' / ' + d.quota.limit : '') + ' ข้อความ</div>' : '') +
+    '<div class="muted">ผูกไลน์แล้ว</div><div>' + linked + ' / ' + d.teachers.length + ' คน</div>' +
+    '</div>' +
+    '<div style="margin-top:14px"><div class="small muted">Webhook URL (นำไปวางใน LINE Developers)</div>' +
+    // ใช้ URL /exec ที่หน้านี้เรียกอยู่จริง — ScriptApp.getService().getUrl() ฝั่งเซิร์ฟเวอร์อาจคืน URL อื่น (เช่น /dev)
+    '<input type="text" readonly value="' + h(apiUrl() || d.webAppUrl || '') + '" onclick="this.select()"></div>' +
+    '<div style="margin-top:10px"><div class="small muted">Channel access token (long-lived)</div>' +
+    '<div class="row"><input type="password" id="tokenInput" class="grow" autocomplete="off" placeholder="' + (d.hasToken ? '•••••• (บันทึกแล้ว — วางใหม่เพื่อเปลี่ยน)' : 'วาง token ที่นี่') + '">' +
+    '<button class="btn sm pri" id="saveTokenBtn">บันทึก</button></div></div>' +
+    '<button class="btn line block" id="testLineBtn" style="margin-top:10px"' + (d.groupId && d.hasToken ? '' : ' disabled') + '>ส่งข้อความทดสอบเข้ากลุ่ม</button>' +
+    '<h3 style="font-size:16px;margin:18px 0 4px">ผูกชื่อครูกับไลน์</h3>' +
+    '<div class="muted small">ง่ายที่สุด: ให้ครูพิมพ์ <code class="cmd">ลงทะเบียน ชื่อ</code> ในกลุ่ม หรือให้ครูพิมพ์อะไรก็ได้ในกลุ่ม 1 ครั้ง แล้วเลือกชื่อไลน์ด้านล่าง</div>' +
+    d.teachers.filter(function (t) { return t.active; }).map(function (t) {
+      return '<div class="linkrow"><div><b>' + h(t.display) + '</b> ' + (t.userId ? '<span class="pill ok">แท็กได้</span>' : '') + '</div>' +
+        '<select data-teacher="' + h(t.name) + '">' + memberOpts(t.userId) + '</select></div>';
+    }).join('') +
+    '<button class="link" id="loadLineBtn">↻ รีเฟรช</button>';
+  $('#lineBox').innerHTML = html;
+}
+
+function saveToken() {
+  var v = ($('#tokenInput').value || '').trim();
+  if (!v) { toast('กรุณาวาง token', true); return; }
+  loading(true, 'กำลังตรวจสอบ token…');
+  run('saveLineToken', ADMIN.pw, v).then(function (r) {
+    toast('เชื่อมบอท ' + r.name + ' แล้ว ✓');
+    return run('getAdminData', ADMIN.pw).then(renderLine);
+  }).catch(fail).then(function () { loading(false); });
+}
+function testLine() {
+  loading(true, 'กำลังส่ง…');
+  run('sendLineTest', ADMIN.pw).then(function () { toast('ส่งข้อความทดสอบแล้ว ✓'); })
+    .catch(fail).then(function () { loading(false); });
+}
+
+boot();
+</script>
+</body>
+</html>

@@ -110,7 +110,7 @@ const lineEvent = (events) => doPost({ postData: { contents: JSON.stringify({ de
   try {
     // ── ตั้งค่า URL ของ API ──
     await page.goto(PAGE);
-    ok(await page.$eval('#tab-settings', (e) => e.classList.contains('on')), 'ยังไม่ตั้ง URL → เปิดแท็บตั้งค่าให้');
+    ok(await page.$eval('#tab-more', (e) => e.classList.contains('on')), 'ยังไม่ตั้ง URL → เปิดแท็บเพิ่มเติมให้');
 
     await page.fill('#apiUrlInput', DEAD);
     await page.click('#apiUrlSaveBtn');
@@ -155,9 +155,43 @@ const lineEvent = (events) => doPost({ postData: { contents: JSON.stringify({ de
     ok(true, 'ส่งไลน์ก่อนใส่ token → แจ้งข้อผิดพลาด');
     await page.click('[data-close="previewModal"]');
 
-    // ── ตั้งค่า LINE ──
-    await page.click('nav.tabbar button[data-tab="settings"]');
-    await page.click('#loadLineBtn');
+    // ── หน้าครูไม่มีส่วนตั้งค่า LINE; ลิงก์ไปหน้าผู้ดูแลมีอยู่ ──
+    await page.click('nav.tabbar button[data-tab="more"]');
+    ok(await page.$('#lineBox') === null && await page.$('#tokenInput') === null, 'หน้าครูไม่มีฟอร์มตั้งค่า LINE');
+    ok(await page.getAttribute('a[href="admin.html"]', 'href') === 'admin.html', 'มีลิงก์ไปหน้าผู้ดูแล');
+
+    // ── หน้าผู้ดูแล: ต้องตั้ง/ใส่รหัสก่อน ──
+    await page.goto(PAGE + 'admin.html');
+    await page.waitForSelector('#setupBox', { state: 'visible' });
+    ok(await page.isHidden('#adminBox'), 'ยังไม่ตั้งรหัส → เห็นแต่ฟอร์มตั้งรหัส ไม่เห็นส่วนผู้ดูแล');
+    await page.fill('#newPw', 'abc');
+    await page.fill('#newPw2', 'abc');
+    await page.click('#setupBtn');
+    await toastHas('อย่างน้อย 6');
+    await page.fill('#newPw', 'secret1');
+    await page.fill('#newPw2', 'secret1');
+    await page.click('#setupBtn');
+    await page.waitForSelector('#adminBox', { state: 'visible' });
+    await idle();
+    ok(true, 'ตั้งรหัสผู้ดูแลครั้งแรกแล้วเข้าสู่ระบบได้');
+
+    await page.click('#logoutBtn');
+    await page.waitForSelector('#loginBox', { state: 'visible' });
+    ok(await page.isHidden('#adminBox') && (await page.$eval('#lineBox', (e) => e.innerHTML)) === '', 'ออกจากระบบ → ซ่อนส่วนผู้ดูแลและล้างข้อมูล');
+    await page.fill('#loginPw', 'wrongpw');
+    await page.click('#loginBtn');
+    await toastHas('ไม่ถูกต้อง');
+    await idle();
+    ok(await page.isHidden('#adminBox'), 'รหัสผิด → ไม่ให้เข้า');
+    await page.fill('#loginPw', 'secret1');
+    await page.click('#loginBtn');
+    await page.waitForSelector('#adminBox', { state: 'visible' });
+    await idle();
+    ok(true, 'รหัสถูก → เข้าหน้าผู้ดูแล');
+    await page.reload();
+    await page.waitForSelector('#adminBox', { state: 'visible' });
+    ok(true, 'รีเฟรชหน้าในแท็บเดิมยังอยู่ในระบบ (sessionStorage)');
+
     await page.fill('#tokenInput', 'tok');
     await page.click('#saveTokenBtn');
     await toastHas('เชื่อมบอท บอทสอนแทน');
@@ -172,7 +206,22 @@ const lineEvent = (events) => doPost({ postData: { contents: JSON.stringify({ de
     await idle();
     ok(await page.$$eval('#lineBox .pill.ok', (x) => x.length) >= 2, 'กลุ่มเชื่อมแล้ว + ครูลงทะเบียนแล้ว (' + subName + ')');
     ok(await page.$eval('#lineBox input[readonly]', (i) => i.value) === API, 'Webhook URL = URL /exec ที่หน้าเว็บใช้อยู่');
-    await shot('settings-line.png');
+    await page.fill('#oldPw', 'secret1');
+    await page.fill('#chPw', 'secret2');
+    await page.fill('#chPw2', 'secret2');
+    await page.click('#changePwBtn');
+    await toastHas('เปลี่ยนรหัสแล้ว');
+    ok(true, 'เปลี่ยนรหัสผู้ดูแลได้');
+    await shot('admin.png');
+
+    // ปิดแท็บผู้ดูแล (ล้าง session) แล้วเปิดใหม่ต้องใส่รหัส — จำลองด้วยการล้าง sessionStorage
+    await page.evaluate(() => sessionStorage.clear());
+    await page.reload();
+    await page.waitForSelector('#loginBox', { state: 'visible' });
+    ok(await page.isHidden('#adminBox'), 'เปิดใหม่โดยไม่มี session → ต้องใส่รหัส');
+
+    await page.goto(PAGE);
+    await idle();
 
     // ── ส่งเข้ากลุ่มไลน์ ──
     await page.click('nav.tabbar button[data-tab="plan"]');
@@ -198,6 +247,7 @@ const lineEvent = (events) => doPost({ postData: { contents: JSON.stringify({ de
     ok(true, 'หน้าสถิติแสดงวันที่จัดสอนแทน');
     await shot('stats.png');
 
+    ok(!log.api.some((c) => c.method === 'GET' && c.fn === 'getAdminData'), 'ฟังก์ชันผู้ดูแลไม่ถูกเรียกผ่าน GET');
     ok(log.preflight === 0, 'ไม่มี CORS preflight');
     ok(log.api.filter((c) => c.method === 'POST').every((c) => /^text\/plain/.test(c.contentType || '')), 'POST ทุกครั้งเป็น text/plain');
     ok(log.errors.length === 0, 'ไม่มี error ใน console' + (log.errors.length ? ': ' + log.errors.join(' | ') : ''));

@@ -161,20 +161,16 @@
     </div>
   </section>
 
-  <!-- ───────── แท็บตั้งค่า ───────── -->
-  <section class="tab" id="tab-settings">
+  <!-- ───────── แท็บเพิ่มเติม ───────── -->
+  <section class="tab" id="tab-more">
     <div class="card">
-      <div class="card-h"><h2>ข้อมูลครูและตารางสอน</h2></div>
-      <div class="muted small">แก้รายชื่อครู คาบเรียน และตารางสอนได้ใน Google Sheet</div>
+      <div class="card-h"><h2>การเชื่อมต่อ API</h2></div>
+      <div class="muted small">URL ของ Apps Script (Web app) ที่หน้าเว็บนี้เรียกใช้เป็นฐานข้อมูล — ขอจากผู้ดูแลระบบ</div>
       <div class="row" style="margin-top:10px">
-        <button class="btn line grow" id="openSheetBtn">เปิด Google Sheet</button>
-        <button class="btn line grow" id="reloadBtn">โหลดข้อมูลใหม่</button>
+        <input type="text" id="apiUrlInput" class="grow" placeholder="https://script.google.com/macros/s/xxxx/exec" autocomplete="off">
+        <button class="btn sm pri" id="apiUrlSaveBtn">บันทึก</button>
       </div>
-    </div>
-
-    <div class="card">
-      <div class="card-h"><h2>เชื่อมต่อ LINE</h2></div>
-      <div id="lineBox"><button class="btn ghost block" id="loadLineBtn">แสดงการตั้งค่า LINE</button></div>
+      <button class="btn line block" id="reloadBtn" style="margin-top:10px">โหลดข้อมูลครู/ตารางสอนใหม่</button>
     </div>
 
     <div class="card">
@@ -188,12 +184,9 @@
     </div>
 
     <div class="card">
-      <div class="card-h"><h2>การเชื่อมต่อ API</h2></div>
-      <div class="muted small">URL ของ Apps Script (Web app) ที่หน้าเว็บนี้เรียกใช้เป็นฐานข้อมูล</div>
-      <div class="row" style="margin-top:10px">
-        <input type="text" id="apiUrlInput" class="grow" placeholder="https://script.google.com/macros/s/xxxx/exec" autocomplete="off">
-        <button class="btn sm pri" id="apiUrlSaveBtn">บันทึก</button>
-      </div>
+      <div class="card-h"><h2>สำหรับผู้ดูแลระบบ</h2></div>
+      <div class="muted small">ตั้งค่า LINE, ผูกชื่อครูกับไลน์, แก้ข้อมูลครูและตารางสอน — ต้องใส่รหัสผู้ดูแล</div>
+      <a class="btn line block" href="admin.html" style="margin-top:10px;display:flex;align-items:center;justify-content:center;text-decoration:none">🔒 เข้าหน้าผู้ดูแลระบบ</a>
     </div>
   </section>
 </div>
@@ -212,7 +205,7 @@
 <nav class="tabbar"><div class="in">
   <button class="on" data-tab="plan"><span class="ic">🗓️</span>จัดสอนแทน</button>
   <button data-tab="stats"><span class="ic">📊</span>สถิติ</button>
-  <button data-tab="settings"><span class="ic">⚙️</span>ตั้งค่า</button>
+  <button data-tab="more"><span class="ic">☰</span>เพิ่มเติม</button>
 </div></nav>
 
 <!-- เลือกครูที่ไม่อยู่ -->
@@ -251,7 +244,7 @@
 <script>
 /* ═══════════════ ตั้งค่าการเชื่อมต่อ API ═══════════════ */
 // วาง URL ของ Apps Script Web app (ลงท้ายด้วย /exec) ที่นี่หลัง Deploy Code.gs
-// หรือจะเว้นว่างไว้แล้วไปกรอกในแท็บ "ตั้งค่า > การเชื่อมต่อ API" ของหน้าเว็บก็ได้ (จำไว้ในเครื่องนั้น)
+// หรือจะเว้นว่างไว้แล้วไปกรอกในแท็บ "เพิ่มเติม > การเชื่อมต่อ API" ของหน้าเว็บก็ได้ (จำไว้ในเครื่องนั้น)
 var APPS_SCRIPT_URL = '';
 
 function apiUrl() {
@@ -273,7 +266,7 @@ var GET_FUNCTIONS = { getInitData: 1, getDateData: 1, getStats: 1 };
 function run(fn) {
   var args = Array.prototype.slice.call(arguments, 1);
   var base = apiUrl();
-  if (!base) return Promise.reject(new Error('ยังไม่ได้ตั้งค่า URL ของ Apps Script — ไปที่แท็บ “ตั้งค่า” เพื่อกรอก'));
+  if (!base) return Promise.reject(new Error('ยังไม่ได้ตั้งค่า URL ของ Apps Script — ไปที่แท็บ “เพิ่มเติม” เพื่อกรอก'));
 
   if (GET_FUNCTIONS[fn]) {
     var url = base + '?fn=' + encodeURIComponent(fn) + '&args=' + encodeURIComponent(JSON.stringify(args));
@@ -290,7 +283,7 @@ function run(fn) {
 // fetch ล้มเหลวทั้งก้อน (เบราว์เซอร์แจ้งแค่ "Failed to fetch") — มักเกิดจากเน็ตหลุด, URL ผิด/เป็น /dev,
 // หรือ Deploy โดยไม่ได้ตั้งผู้มีสิทธิ์เข้าถึงเป็น "ทุกคน" (Google จะพาไปหน้า login ซึ่งเรียกข้ามโดเมนไม่ได้)
 function netFail() {
-  throw new Error('เชื่อมต่อ Apps Script ไม่ได้ — ตรวจสอบอินเทอร์เน็ต และ URL ในแท็บ “ตั้งค่า” (ต้องลงท้ายด้วย /exec และ Deploy โดยให้ “ทุกคน” เข้าถึงได้)');
+  throw new Error('เชื่อมต่อ Apps Script ไม่ได้ — ตรวจสอบอินเทอร์เน็ต และ URL ในแท็บ “เพิ่มเติม” (ต้องลงท้ายด้วย /exec และ Deploy โดยให้ “ทุกคน” เข้าถึงได้)');
 }
 
 function readJson(res) {
@@ -333,7 +326,7 @@ function addDays(ds, n) {
   return d.toISOString().slice(0, 10);
 }
 
-function pinFail(e) { toast(errMsg(e), true); }
+function fail(e) { toast(errMsg(e), true); }
 
 /* ═══════════════ ตั้งค่า URL ของ API ═══════════════ */
 $('#apiUrlSaveBtn').onclick = function () {
@@ -353,8 +346,8 @@ $('#apiUrlSaveBtn').onclick = function () {
 function boot() {
   $('#apiUrlInput').value = apiUrl();
   if (!apiUrl()) {
-    $('#absentList').innerHTML = '<div class="empty">ยังไม่ได้ตั้งค่า URL ของ Apps Script<br>ไปที่แท็บ “ตั้งค่า” ด้านล่างเพื่อกรอก URL ก่อนใช้งาน</div>';
-    showTab('settings');
+    $('#absentList').innerHTML = '<div class="empty">ยังไม่ได้ตั้งค่า URL ของ Apps Script<br>ไปที่แท็บ “เพิ่มเติม” ด้านล่างเพื่อกรอก URL ก่อนใช้งาน</div>';
+    showTab('more');
     toast('กรุณาตั้งค่า URL ของ Apps Script ก่อน', true);
     return Promise.resolve(false);
   }
@@ -630,7 +623,7 @@ $('#saveBtn').onclick = function () {
       loading(false);
       if (S.plan.length) openPreview();
     });
-  }).catch(function (e) { loading(false); pinFail(e); });
+  }).catch(function (e) { loading(false); fail(e); });
 };
 
 window.addEventListener('beforeunload', function (e) { if (S.dirty) { e.preventDefault(); e.returnValue = ''; } });
@@ -800,7 +793,7 @@ $('#sendLineBtn').onclick = function () {
       toast('ส่งเข้ากลุ่มไลน์แล้ว ✓' + (r.untagged && r.untagged.length ? ' (ไม่ได้แท็ก: ' + r.untagged.join(', ') + ')' : ''));
       closeModal('previewModal');
     });
-  }).catch(function (e) { loading(false); pinFail(e); });
+  }).catch(function (e) { loading(false); fail(e); });
 };
 
 $('#saveImgBtn').onclick = function () {
@@ -829,7 +822,7 @@ $('#driveBtn').onclick = function () {
   Promise.resolve().then(function () {
     loading(true, 'กำลังบันทึกลง Drive…');
     return run('saveImageToDrive', S.date, S.img).then(function (r) { loading(false); go(r); });
-  }).catch(function (e) { loading(false); if (w) w.close(); pinFail(e); });
+  }).catch(function (e) { loading(false); if (w) w.close(); fail(e); });
 };
 
 /* ═══════════════ แท็บ ═══════════════ */
@@ -873,87 +866,13 @@ $('#statDates').addEventListener('click', function (e) {
   loadDate(b.getAttribute('data-date'));
 });
 
-/* ═══════════════ ตั้งค่า ═══════════════ */
-$('#openSheetBtn').onclick = function () { if (S.init) window.open(S.init.sheetUrl, '_blank'); };
+/* ═══════════════ เพิ่มเติม ═══════════════ */
 $('#reloadBtn').onclick = function () {
   loading(true);
   run('getInitData').then(function (init) { applyInit(init); return loadDate(S.date || init.today, true); })
     .then(function () { toast('โหลดข้อมูลใหม่แล้ว ✓'); })
     .catch(function (e) { toast(errMsg(e), true); }).then(function () { loading(false); });
 };
-
-$('#lineBox').addEventListener('click', function (e) {
-  var b = e.target.closest('button');
-  if (!b) return;
-  if (b.id === 'loadLineBtn') loadLine();
-  else if (b.id === 'saveTokenBtn') saveToken();
-  else if (b.id === 'testLineBtn') testLine();
-});
-$('#lineBox').addEventListener('change', function (e) {
-  var el = e.target;
-  if (!el.hasAttribute('data-teacher')) return;
-  loading(true, 'กำลังบันทึก…');
-  run('linkTeacherLine', el.getAttribute('data-teacher'), el.value).then(function () {
-    toast(el.value ? 'ผูกไลน์แล้ว ✓' : 'ยกเลิกการผูกแล้ว');
-    return run('getInitData').then(applyInit);
-  }).catch(pinFail).then(function () { loading(false); });
-});
-
-function loadLine() {
-  Promise.resolve().then(function () {
-    loading(true);
-    return run('getAdminData').then(function (d) { loading(false); renderLine(d); });
-  }).catch(function (e) { loading(false); pinFail(e); });
-}
-
-function renderLine(d) {
-  var linked = d.teachers.filter(function (t) { return t.userId; }).length;
-  var memberOpts = function (cur) {
-    var has = false;
-    var o = '<option value="">— ยังไม่ผูก —</option>' + d.members.map(function (m) {
-      if (m.userId === cur) has = true;
-      return '<option value="' + h(m.userId) + '"' + (m.userId === cur ? ' selected' : '') + '>' + h(m.name) + '</option>';
-    }).join('');
-    if (cur && !has) o += '<option value="' + h(cur) + '" selected>(ผูกไว้แล้ว)</option>';
-    return o;
-  };
-  var html = '<div class="kv">' +
-    '<div class="muted">บอท</div><div>' + (d.bot ? (d.bot.error ? '<span class="pill no">ผิดพลาด</span> ' + h(d.bot.error) : '<b>' + h(d.bot.name) + '</b> <span class="muted small">' + h(d.bot.basicId || '') + '</span>') : '<span class="pill no">ยังไม่ใส่ Token</span>') + '</div>' +
-    '<div class="muted">กลุ่มไลน์</div><div>' + (d.groupId ? '<span class="pill ok">เชื่อมแล้ว</span>' : '<span class="pill no">ยังไม่เชื่อม</span> <span class="small muted">เชิญบอทเข้ากลุ่ม</span>') + '</div>' +
-    (d.quota ? '<div class="muted">โควตาเดือนนี้</div><div>ใช้ไป ' + d.quota.used + (d.quota.type === 'limited' ? ' / ' + d.quota.limit : '') + ' ข้อความ</div>' : '') +
-    '<div class="muted">ผูกไลน์แล้ว</div><div>' + linked + ' / ' + d.teachers.length + ' คน</div>' +
-    '</div>' +
-    '<div style="margin-top:14px"><div class="small muted">Webhook URL (นำไปวางใน LINE Developers)</div>' +
-    // ใช้ URL /exec ที่หน้านี้เรียกอยู่จริง — ScriptApp.getService().getUrl() ฝั่งเซิร์ฟเวอร์อาจคืน URL อื่น (เช่น /dev)
-    '<input type="text" readonly value="' + h(apiUrl() || S.init.webAppUrl || '') + '" onclick="this.select()"></div>' +
-    '<div style="margin-top:10px"><div class="small muted">Channel access token (long-lived)</div>' +
-    '<div class="row"><input type="password" id="tokenInput" class="grow" placeholder="' + (d.hasToken ? '•••••• (บันทึกแล้ว — วางใหม่เพื่อเปลี่ยน)' : 'วาง token ที่นี่') + '">' +
-    '<button class="btn sm pri" id="saveTokenBtn">บันทึก</button></div></div>' +
-    '<button class="btn line block" id="testLineBtn" style="margin-top:10px"' + (d.groupId && d.hasToken ? '' : ' disabled') + '>ส่งข้อความทดสอบเข้ากลุ่ม</button>' +
-    '<h3 style="font-size:16px;margin:18px 0 4px">ผูกชื่อครูกับไลน์</h3>' +
-    '<div class="muted small">ง่ายที่สุด: ให้ครูพิมพ์ <code class="cmd">ลงทะเบียน ชื่อ</code> ในกลุ่ม หรือให้ครูพิมพ์อะไรก็ได้ในกลุ่ม 1 ครั้ง แล้วเลือกชื่อไลน์ด้านล่าง</div>' +
-    d.teachers.filter(function (t) { return t.active; }).map(function (t) {
-      return '<div class="linkrow"><div><b>' + h(t.display) + '</b> ' + (t.userId ? '<span class="pill ok">แท็กได้</span>' : '') + '</div>' +
-        '<select data-teacher="' + h(t.name) + '">' + memberOpts(t.userId) + '</select></div>';
-    }).join('') +
-    '<button class="link" id="loadLineBtn">↻ รีเฟรช</button>';
-  $('#lineBox').innerHTML = html;
-}
-
-function saveToken() {
-  var v = ($('#tokenInput').value || '').trim();
-  if (!v) { toast('กรุณาวาง token', true); return; }
-  loading(true, 'กำลังตรวจสอบ token…');
-  run('saveLineToken', v).then(function (r) {
-    toast('เชื่อมบอท ' + r.name + ' แล้ว ✓');
-    return run('getAdminData').then(renderLine);
-  }).catch(pinFail).then(function () { loading(false); });
-}
-function testLine() {
-  loading(true, 'กำลังส่ง…');
-  run('sendLineTest').then(function () { toast('ส่งข้อความทดสอบแล้ว ✓'); })
-    .catch(pinFail).then(function () { loading(false); });
-}
 
 boot();
 </script>
