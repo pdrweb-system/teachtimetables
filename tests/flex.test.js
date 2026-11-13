@@ -130,6 +130,8 @@ post('setAdminPassword', ['secret1']);
 post('saveLineToken', ['secret1', 'tok']);
 const subNames = [...new Set(rows.filter((r) => r.sub).map((r) => r.sub))];
 const linkedName = subNames[0];
+line([{ type: 'message', replyToken: 'r0', source: { type: 'group', groupId: 'G1', userId: 'U111' }, message: { type: 'text', text: 'สวัสดี' } }]);
+ok(post('setLineGroup', ['secret1', 'G1']).ok, 'เลือกกลุ่มรับประกาศ');
 ok(post('linkTeacherLine', ['secret1', linkedName, 'U111']).ok, 'ผูกไลน์ให้ ' + linkedName);
 const disp = (n) => teachers_().find((t) => t.name === n).display;
 
@@ -163,10 +165,12 @@ rep = say('แจ้งตารางสอนแทน', { type: 'user', userI
 ok(rep.length === 1 && rep[0].payload.messages.length === 1 && rep[0].payload.messages[0].type === 'flex', 'แชต 1:1 → Flex อย่างเดียว');
 
 // ── 3) วันที่ไม่มีการจัด / คำอื่น ──
-rep = say('แจ้งตารางสอนแทน พรุ่งนี้');
-ok(rep.length === 1 && rep[0].payload.messages[0].type === 'text' && rep[0].payload.messages[0].text.indexOf('วันอังคารที่ 29 กันยายน 2569') >= 0, 'พรุ่งนี้ไม่มีการจัด → ตอบข้อความแจ้ง');
-ok(say('แจ้งตารางสอนแทนครับ').length === 0, 'ข้อความอื่นที่ไม่ตรงคำสั่ง → ไม่ตอบ');
-ok(say('คำสั่ง')[0].payload.messages[0].text.indexOf('แจ้งตารางสอนแทน') >= 0, 'รายการคำสั่งมี แจ้งตารางสอนแทน');
+const realToday = globalThis.todayStr_;
+globalThis.todayStr_ = (o) => realToday((o || 0) + 1); // พรุ่งนี้ (ไม่มีการจัด)
+rep = say('แจ้งตารางสอนแทน');
+globalThis.todayStr_ = realToday;
+ok(rep.length === 1 && rep[0].payload.messages[0].type === 'text' && rep[0].payload.messages[0].text.indexOf('วันอังคารที่ 29 กันยายน 2569') >= 0, 'วันที่ไม่มีการจัด → ตอบข้อความแจ้ง');
+['แจ้งตารางสอนแทน พรุ่งนี้', 'แจ้งตารางสอนแทนพรุ่งนี้', 'แจ้งตารางสอนแทนครับ', 'คำสั่ง', 'สอนแทน'].forEach((t) => ok(say(t).length === 0, 'ข้อความอื่นไม่ตอบ: ' + t));
 
 // ── 4) มีภาพใน Drive → ปุ่มดูภาพ ──
 const img = post('saveImageToDrive', [DATE, 'data:image/jpeg;base64,AAAA']).result;

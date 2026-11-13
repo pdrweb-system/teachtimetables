@@ -67,6 +67,7 @@
       let body = '{}';
       if (path === '/v2/bot/info') body = JSON.stringify({ userId: 'UBOT', displayName: 'บอทสอนแทน', basicId: '@123abc' });
       else if (path.indexOf('/member/') >= 0 || path.indexOf('/profile/') >= 0) body = JSON.stringify({ displayName: 'LINE-' + path.split('/').pop() });
+      else if (/\/group\/[^/]+\/summary$/.test(path)) body = JSON.stringify({ groupName: 'กลุ่มครู ' + path.split('/')[4] });
       else if (path === '/v2/bot/message/quota') body = JSON.stringify({ type: 'limited', value: 300 });
       else if (path === '/v2/bot/message/quota/consumption') body = JSON.stringify({ totalUsage: 12 });
       return { getResponseCode: () => 200, getContentText: () => body };

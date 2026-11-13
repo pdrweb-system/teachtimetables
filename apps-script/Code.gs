@@ -42,17 +42,6 @@ const TH_MONTHS = ['มกราคม', 'กุมภาพันธ์', 'ม�
 const TZ = 'Asia/Bangkok';
 const PROP = PropertiesService.getScriptProperties();
 
-const HELP_TEXT = [
-  '🤖 คำสั่งบอทสอนแทน',
-  '• แจ้งตารางสอนแทน — ประกาศตารางสอนแทนวันนี้ (การ์ด + แท็กชื่อ)',
-  '• แจ้งตารางสอนแทนพรุ่งนี้ — ประกาศของวันพรุ่งนี้',
-  '• สอนแทน — ดูตารางสอนแทนวันนี้ (ภาพ + ข้อความ)',
-  '• สอนแทนพรุ่งนี้ — ดูของวันพรุ่งนี้',
-  '• ลงทะเบียน ชื่อ — ผูกไลน์กับชื่อครู เช่น ลงทะเบียน สมชาย',
-  '• ตั้งกลุ่มนี้ — ใช้กลุ่มนี้รับประกาศสอนแทน',
-  '• คำสั่ง — แสดงรายการคำสั่ง',
-].join('\n');
-
 // ───────────────────────── JSON API (หน้าเว็บอยู่บน GitHub Pages) ─────────────────────────
 // หน้าเว็บเรียก: GET  ?fn=<ชื่อ>&args=<JSON array>      → ฟังก์ชันอ่านอย่างเดียว
 //               POST body (text/plain) {"fn":..,"args":[..]} → ฟังก์ชันที่เขียนข้อมูล/ส่งไลน์
@@ -76,6 +65,7 @@ const POST_API = {
   getAdminData: getAdminData,
   saveLineToken: saveLineToken,
   linkTeacherLine: linkTeacherLine,
+  setLineGroup: setLineGroup,
 };
 
 function doGet(e) {
@@ -522,13 +512,6 @@ const FLEX = {
   MAX_CAROUSEL_BYTES: 50000,
   C: { pri: '#1f4e8c', pri2: '#2f74c0', head: '#1f3b63', ink: '#1c2533', muted: '#6b778a', ok: '#0b7a3e', err: '#c62828', line: '#e2e8f0' },
 };
-const DAY_WORDS = ['วันนี้', 'พรุ่งนี้', 'มะรืนนี้'];
-
-function dayOffset_(word) {
-  if (!word || word === 'วันนี้') return 0;
-  return word === 'พรุ่งนี้' ? 1 : 2;
-}
-
 function utf8Len_(s) {
   let n = 0;
   for (let i = 0; i < s.length; i++) {
@@ -791,6 +774,7 @@ function getAdminData(pw) {
     hasToken: hasToken,
     bot: bot,
     groupId: st[SET.GROUP] || '',
+    groups: knownGroups_(hasToken),
     teachers: teachers_().map(function (t) {
       return { name: t.name, display: t.display, userId: t.userId, lineName: t.lineName, active: t.active };
     }),
@@ -798,6 +782,38 @@ function getAdminData(pw) {
       return { userId: str_(r[0]), name: str_(r[1]) || '(ไม่ทราบชื่อ)', lastSeen: str_(r[3]) };
     }).filter(function (m) { return m.userId; }),
   };
+}
+
+/** กลุ่มที่บอทเคยเห็นสมาชิกพิมพ์ (จากชีตสมาชิกไลน์) พร้อมชื่อกลุ่มจาก LINE — ให้ผู้ดูแลเลือกกลุ่มรับประกาศ */
+function knownGroups_(withNames) {
+  const count = {};
+  const order = [];
+  rows_(SH.MEMBERS).forEach(function (r) {
+    const g = str_(r[2]);
+    if (!g) return;
+    if (!(g in count)) { count[g] = 0; order.push(g); }
+    count[g]++;
+  });
+  const cur = settings_()[SET.GROUP];
+  if (cur && !(cur in count)) { count[cur] = 0; order.push(cur); }
+  return order.map(function (g) {
+    let name = '';
+    if (withNames) {
+      try { name = lineApi_('/v2/bot/group/' + g + '/summary', null, 'get').groupName || ''; } catch (e) { /* ไม่ทราบชื่อ */ }
+    }
+    return { groupId: g, name: name, seen: count[g] };
+  });
+}
+
+/** เลือกกลุ่มรับประกาศ (บอทจะตอบคำสั่งเฉพาะกลุ่มนี้) — ส่ง groupId ว่างเพื่อล้างการเลือก */
+function setLineGroup(pw, groupId) {
+  adminGuard_(pw);
+  groupId = str_(groupId);
+  if (groupId && !knownGroups_(false).some(function (g) { return g.groupId === groupId; })) {
+    throw new Error('ยังไม่เคยเห็นกลุ่มนี้ — ให้ใครสักคนพิมพ์อะไรก็ได้ในกลุ่มก่อน แล้วกดรีเฟรช');
+  }
+  setSetting_(SET.GROUP, groupId);
+  return true;
 }
 
 function saveLineToken(pw, token) {
@@ -890,26 +906,21 @@ function handleLineWebhook_(body) {
 function ok_() { return ContentService.createTextOutput('OK'); }
 
 // บอทตัวเดียวอาจถูกใช้ร่วมกับระบบอื่น (ระบบเดิมส่งต่อ webhook มา) → event จากกลุ่มอื่นก็มาถึงที่นี่ด้วย
-// จึงทำงานเฉพาะกลุ่มที่ตั้งไว้ (LINE groupId): กลุ่ม/ห้องอื่นถูกเมินทั้งหมด ยกเว้นคำสั่ง "ตั้งกลุ่มนี้"
-// ตั้งกลุ่มได้ 2 ทาง: บอทเพิ่งถูกเชิญเข้ากลุ่ม (join) ตอนที่ยังไม่ได้ตั้ง หรือพิมพ์ "ตั้งกลุ่มนี้" ในกลุ่ม
-// (ไม่ตั้งอัตโนมัติจากข้อความแรกอีกแล้ว เพราะอาจเป็นกลุ่มของระบบอื่น)
+// - ยังไม่ได้เลือกกลุ่มรับประกาศ: เก็บรายชื่อสมาชิกจากทุกกลุ่ม (ให้ผู้ดูแลเห็นกลุ่ม/ชื่อไลน์ในหน้า admin) แต่ไม่ตอบอะไร
+// - เลือกกลุ่มแล้ว (หน้า admin → setLineGroup): ทำงานเฉพาะกลุ่มนั้น กลุ่ม/ห้องอื่นถูกเมินทั้งหมด
+// - แชต 1:1 กับบอทตอบคำสั่งได้เสมอ
+// คำสั่งเดียวที่บอทตอบ: "แจ้งตารางสอนแทน" (ดู handleText_) — ไม่ทักทาย ไม่ตอบ join/ลงทะเบียน/ตั้งกลุ่ม ฯลฯ
 function handleEvent_(ev) {
   const src = ev.source || {};
   const group = settings_()[SET.GROUP];
-  const isSetGroupCmd = src.type === 'group' && ev.type === 'message' && ev.message && ev.message.type === 'text' &&
-    /^ตั้งกลุ่มนี้$/.test(str_(ev.message.text).replace(/\s+/g, ' '));
-  if (group && !isSetGroupCmd && (src.type === 'room' || (src.type === 'group' && src.groupId !== group))) return;
+  if (src.type === 'room') return;
+  if (src.type === 'group' && group && src.groupId !== group) return;
 
-  if (src.type === 'group' && ev.type === 'join') {
-    if (group && group !== src.groupId) return;
-    setSetting_(SET.GROUP, src.groupId);
-    reply_(ev.replyToken, [{ type: 'text', text: 'สวัสดีครับ 👋 ตั้งกลุ่มนี้เป็นกลุ่มรับประกาศสอนแทนแล้ว\nให้คุณครูแต่ละท่านพิมพ์ "ลงทะเบียน ชื่อ" เพื่อให้ระบบแท็กชื่อได้\n\n' + HELP_TEXT }]);
-    return;
-  }
   if (src.userId) upsertMember_(src.groupId || '', src.userId, false);
   if (ev.type === 'memberJoined' && ev.joined) {
     (ev.joined.members || []).forEach(function (m) { if (m.userId) upsertMember_(src.groupId || '', m.userId, false); });
   }
+  if (src.type === 'group' && !group) return;
   if (ev.type === 'message' && ev.message && ev.message.type === 'text') handleText_(ev);
 }
 
@@ -946,92 +957,26 @@ function upsertMember_(groupId, userId, force) {
   return name;
 }
 
+/** คำสั่งเดียว: "แจ้งตารางสอนแทน" (ของวันนี้) → reply เป็น Flex + ข้อความแท็กชื่อผู้สอนแทน; ข้อความอื่นไม่ตอบ */
 function handleText_(ev) {
   const text = str_(ev.message.text).replace(/\s+/g, ' ');
   const src = ev.source || {};
-  const inGroup = src.type === 'group' || src.type === 'room';
+  const inGroup = src.type === 'group';
+  if (text !== 'แจ้งตารางสอนแทน') return;
 
-  if (/^(คำสั่ง|ช่วยเหลือ|help)$/i.test(text)) {
-    reply_(ev.replyToken, [{ type: 'text', text: HELP_TEXT }]);
+  const dd = getDateData(todayStr_(0));
+  if (!dd.subs.length) {
+    reply_(ev.replyToken, [{ type: 'text', text: 'ยังไม่มีการจัดสอนแทนของ' + dd.thaiDate }]);
     return;
   }
-
-  if (/^ตั้งกลุ่มนี้$/.test(text) && src.type === 'group') {
-    setSetting_(SET.GROUP, src.groupId);
-    reply_(ev.replyToken, [{ type: 'text', text: '✅ ตั้งกลุ่มนี้เป็นกลุ่มรับประกาศสอนแทนแล้ว' }]);
-    return;
-  }
-
-  let m = text.match(/^ลงทะเบียน ?(.*)$/);
-  if (m) {
-    registerTeacher_(ev, str_(m[1]), inGroup);
-    return;
-  }
-
-  // แจ้งตารางสอนแทน [วันนี้|พรุ่งนี้|มะรืน] → reply (ฟรี) เป็น Flex + ข้อความแท็กชื่อผู้สอนแทน
-  m = text.match(/^แจ้งตารางสอนแทน ?(วันนี้|พรุ่งนี้|มะรืน(?:นี้)?)?$/);
-  if (m) {
-    const off = dayOffset_(m[1]);
-    const dd = getDateData(todayStr_(off));
-    if (!dd.subs.length) {
-      reply_(ev.replyToken, [{ type: 'text', text: 'ยังไม่มีการจัดสอนแทนของ' + dd.thaiDate }]);
-      return;
-    }
-    const msgs = [buildFlexMessage_(dd)];
-    const notice = inGroup ? buildMentionNotice_(dd, DAY_WORDS[off]) : null;
-    if (notice) msgs.push(notice);
-    try {
-      reply_(ev.replyToken, msgs);
-    } catch (err) {
-      // Flex ถูก LINE ปฏิเสธ (เช่น ข้อมูลยาวผิดปกติ) → ตอบเป็นข้อความธรรมดาแทน (reply token ยังใช้ได้เมื่อคำขอแรกล้ม)
-      console.error('Flex reply failed: ' + err.message);
-      reply_(ev.replyToken, [buildLineMessage_(dd, inGroup).message]);
-    }
-    return;
-  }
-
-  m = text.match(/^สอนแทน ?(วันนี้|พรุ่งนี้|มะรืน(?:นี้)?)?$/);
-  if (m) {
-    const off = dayOffset_(m[1]);
-    const dd = getDateData(todayStr_(off));
-    if (!dd.subs.length) {
-      reply_(ev.replyToken, [{ type: 'text', text: 'ยังไม่มีการจัดสอนแทนของ' + dd.thaiDate }]);
-      return;
-    }
-    const msgs = [];
-    if (dd.image) msgs.push({ type: 'image', originalContentUrl: dd.image.url, previewImageUrl: dd.image.url });
-    msgs.push(buildLineMessage_(dd, inGroup).message);
+  const msgs = [buildFlexMessage_(dd)];
+  const notice = inGroup ? buildMentionNotice_(dd, 'วันนี้') : null;
+  if (notice) msgs.push(notice);
+  try {
     reply_(ev.replyToken, msgs);
-  }
-}
-
-function registerTeacher_(ev, arg, inGroup) {
-  const src = ev.source || {};
-  const key = arg.replace(/^ครู/, '').trim();
-  if (!key) {
-    reply_(ev.replyToken, [{ type: 'text', text: 'พิมพ์ "ลงทะเบียน" ตามด้วยชื่อ เช่น ลงทะเบียน สมชาย' }]);
-    return;
-  }
-  const hits = teachers_().filter(function (t) {
-    return [t.name, t.display].some(function (x) { return x.replace(/^ครู/, '').indexOf(key) >= 0; });
-  });
-  if (hits.length !== 1) {
-    const msg = hits.length
-      ? 'พบหลายชื่อ: ' + hits.map(function (t) { return t.name; }).join(', ') + '\nกรุณาพิมพ์ชื่อให้ชัดขึ้น'
-      : 'ไม่พบชื่อ "' + key + '" ในรายชื่อครู กรุณาตรวจสอบกับผู้ดูแลระบบ';
-    reply_(ev.replyToken, [{ type: 'text', text: msg }]);
-    return;
-  }
-  const t = hits[0];
-  const lineName = upsertMember_(src.groupId || '', src.userId, true);
-  sheet_(SH.TEACHERS).getRange(t.row, 4, 1, 2).setValues([[src.userId, lineName]]);
-  if (inGroup) {
-    reply_(ev.replyToken, [{
-      type: 'textV2',
-      text: '{u} ✅ ลงทะเบียนเป็น ' + t.name.replace(/[{}]/g, function (c) { return c + c; }) + ' เรียบร้อย',
-      substitution: { u: { type: 'mention', mentionee: { type: 'user', userId: src.userId } } },
-    }]);
-  } else {
-    reply_(ev.replyToken, [{ type: 'text', text: '✅ ลงทะเบียนเป็น ' + t.name + ' เรียบร้อย' }]);
+  } catch (err) {
+    // Flex ถูก LINE ปฏิเสธ (เช่น ข้อมูลยาวผิดปกติ) → ตอบเป็นข้อความธรรมดาแทน (reply token ยังใช้ได้เมื่อคำขอแรกล้ม)
+    console.error('Flex reply failed: ' + err.message);
+    reply_(ev.replyToken, [buildLineMessage_(dd, inGroup).message]);
   }
 }

@@ -195,14 +195,23 @@ const lineEvent = (events) => doPost({ postData: { contents: JSON.stringify({ de
     await toastHas('เชื่อมบอท บอทสอนแทน');
     await idle();
     ok(true, 'บันทึก token → แสดงชื่อบอท');
-    lineEvent([{ type: 'join', replyToken: 'r1', source: { type: 'group', groupId: 'G1' } }]);
+    // ครูพิมพ์ในกลุ่ม (กลุ่มของบอท 2 กลุ่ม) → admin เห็นกลุ่ม/ชื่อไลน์ แล้วเลือกกลุ่มรับประกาศ + ผูกชื่อครู
     const subName = rows_('บันทึกสอนแทน').filter((r) => r[7])[0][7];
-    lineEvent([{ type: 'message', replyToken: 'r2', source: { type: 'group', groupId: 'G1', userId: 'U111' },
-      message: { type: 'text', text: 'ลงทะเบียน ' + subName.replace(/^ครู/, '').split(' ')[0] } }]);
+    lineEvent([{ type: 'message', replyToken: 'r2', source: { type: 'group', groupId: 'G1', userId: 'U111' }, message: { type: 'text', text: 'สวัสดีครับ' } }]);
+    lineEvent([{ type: 'message', replyToken: 'r2b', source: { type: 'group', groupId: 'GOTHER', userId: 'UX' }, message: { type: 'text', text: 'แจ้งตารางสอนแทน' } }]);
+    __lineCalls.length = 0;
     await page.click('#loadLineBtn');
-    await page.waitForFunction(() => /เชื่อมแล้ว/.test(document.querySelector('#lineBox').textContent));
+    await page.waitForFunction(() => document.querySelectorAll('#groupSel option').length === 3);
     await idle();
-    ok(await page.$$eval('#lineBox .pill.ok', (x) => x.length) >= 2, 'กลุ่มเชื่อมแล้ว + ครูลงทะเบียนแล้ว (' + subName + ')');
+    ok((await page.textContent('#groupSel')).indexOf('กลุ่มครู G1') >= 0, 'หน้า admin แสดงกลุ่มที่บอทเห็น (พร้อมชื่อกลุ่ม)');
+    await page.selectOption('#groupSel', 'G1');
+    await toastHas('เลือกกลุ่มรับประกาศแล้ว');
+    await idle();
+    ok(await page.$eval('#groupSel', (e) => e.value) === 'G1', 'เลือกกลุ่มรับประกาศแล้ว');
+    await page.selectOption('select[data-teacher="' + subName + '"]', 'U111');
+    await toastHas('ผูกไลน์แล้ว');
+    await idle();
+    ok(await page.$$eval('#lineBox .pill.ok', (x) => x.length) >= 2, 'ผูกชื่อครูกับไลน์แล้ว (' + subName + ')');
     ok(await page.$eval('#lineBox input[readonly]', (i) => i.value) === API, 'Webhook URL = URL /exec ที่หน้าเว็บใช้อยู่');
     await page.fill('#oldPw', 'secret1');
     await page.fill('#chPw', 'secret2');
@@ -233,8 +242,8 @@ const lineEvent = (events) => doPost({ postData: { contents: JSON.stringify({ de
 
     __lineCalls.length = 0;
     lineEvent([{ type: 'message', replyToken: 'r3', source: { type: 'group', groupId: 'G1', userId: 'U2' }, message: { type: 'text', text: 'สอนแทน' } }]);
-    const rep = __lineCalls.find((c) => c.path === '/v2/bot/message/reply');
-    ok(rep && rep.payload.messages[0].type === 'image' && rep.payload.messages[1].type === 'textV2', 'คำสั่ง สอนแทน ในกลุ่ม → ตอบภาพ + แท็กชื่อ (reply ฟรี)');
+    lineEvent([{ type: 'message', replyToken: 'r6', source: { type: 'group', groupId: 'GOTHER', userId: 'UX' }, message: { type: 'text', text: 'แจ้งตารางสอนแทน' } }]);
+    ok(!__lineCalls.some((c) => c.path === '/v2/bot/message/reply'), 'คำอื่น และกลุ่มอื่น → บอทไม่ตอบ')
 
     await page.click('[data-close="previewModal"]');
 

@@ -70,40 +70,51 @@ CacheService.getScriptCache().remove('admin_fails');
 const AP = 'newsecret2';
 ok(post('verifyAdmin', [AP]).ok, 'unlocked after the lock expires');
 
-// LINE
+// LINE — บอทตอบคำสั่งเดียว: "แจ้งตารางสอนแทน"
 ok(post('saveLineToken', [AP, 'tok']).result.name === 'บอทสอนแทน', 'saveLineToken');
-line([{ type: 'join', replyToken: 'r1', source: { type: 'group', groupId: 'G1' } }]);
-ok(settings_()['LINE groupId'] === 'G1', 'join event sets group');
-// บอทใช้ร่วมกับระบบอื่น: กลุ่มอื่นต้องไม่ถูกตั้งเป็นกลุ่มประกาศ/ไม่ได้คำตอบ/ไม่ถูกเก็บสมาชิก
-__lineCalls.length = 0;
-line([{ type: 'message', replyToken: 'rx', source: { type: 'group', groupId: 'GOTHER', userId: 'UX' }, message: { type: 'text', text: 'คำสั่ง' } }]);
-ok(!__lineCalls.some(c => c.path === '/v2/bot/message/reply') && settings_()['LINE groupId'] === 'G1', 'other group: ignored (no reply, group unchanged)');
-ok(!rows_('สมาชิกไลน์').some(r => r[0] === 'UX'), 'other group: member not stored');
-line([{ type: 'join', replyToken: 'rj', source: { type: 'group', groupId: 'GOTHER' } }]);
-ok(settings_()['LINE groupId'] === 'G1', 'join of another group does not replace the configured group');
-line([{ type: 'message', replyToken: 'rs', source: { type: 'group', groupId: 'GNEW', userId: 'UY' }, message: { type: 'text', text: 'ตั้งกลุ่มนี้' } }]);
-ok(settings_()['LINE groupId'] === 'GNEW', 'ตั้งกลุ่มนี้ works from any group');
-line([{ type: 'message', replyToken: 'rs2', source: { type: 'group', groupId: 'G1', userId: 'UY' }, message: { type: 'text', text: 'ตั้งกลุ่มนี้' } }]);
-ok(settings_()['LINE groupId'] === 'G1', 'ตั้งกลุ่มนี้ switches back');
-__lineCalls.length = 0;
-line([{ type: 'message', replyToken: 'ru', source: { type: 'user', userId: 'U2' }, message: { type: 'text', text: 'คำสั่ง' } }]);
-ok(__lineCalls.some(c => c.path === '/v2/bot/message/reply'), '1:1 chat still gets replies');
+const replies = () => __lineCalls.filter(c => c.path === '/v2/bot/message/reply');
+const say = (text, source, token) => { __lineCalls.length = 0; line([{ type: 'message', replyToken: token || 'rt', source, message: { type: 'text', text } }]); return replies(); };
+const inG = (g, u) => ({ type: 'group', groupId: g, userId: u });
 const firstSub = rows.find(r => r.sub).sub;
-line([{ type: 'message', replyToken: 'r2', source: { type: 'group', groupId: 'G1', userId: 'U111' },
-  message: { type: 'text', text: 'ลงทะเบียน ' + firstSub.replace(/^ครู/, '').split(' ')[0] } }]);
-ok(teachers_().find(t => t.name === firstSub).userId === 'U111', 'ลงทะเบียน links userId');
-
-post('saveImageToDrive', [date, 'data:image/jpeg;base64,AAAA']);
 globalThis.todayStr_ = () => date; // ให้ "วันนี้" ของคำสั่งในกลุ่ม = วันที่ทดสอบ
-__lineCalls.length = 0;
-line([{ type: 'message', replyToken: 'r5', source: { type: 'group', groupId: 'G1', userId: 'U2' }, message: { type: 'text', text: 'สอนแทน' } }]);
-const rep = __lineCalls.find(c => c.path === '/v2/bot/message/reply').payload;
-ok(rep.messages[0].type === 'image' && rep.messages[1].type === 'textV2', 'สอนแทน replies image + textV2');
-ok(rep.messages[1].substitution.t0.mentionee.userId === 'U111', 'mention substitution');
+post('saveImageToDrive', [date, 'data:image/jpeg;base64,AAAA']);
 
+// ยังไม่ได้เลือกกลุ่ม: เก็บรายชื่อสมาชิกแต่ไม่ตอบอะไร และ join ไม่ตั้งกลุ่ม/ไม่ทักทาย
 __lineCalls.length = 0;
-line([{ type: 'message', replyToken: 'r3', source: { type: 'group', groupId: 'G1', userId: 'U2' }, message: { type: 'text', text: 'คำสั่ง' } }]);
-ok(__lineCalls.some(c => c.path === '/v2/bot/message/reply'), 'คำสั่ง replies (free)');
+line([{ type: 'join', replyToken: 'r1', source: { type: 'group', groupId: 'G1' } }]);
+ok(!replies().length && !settings_()['LINE groupId'], 'join: no greeting, group not auto-set');
+ok(say('แจ้งตารางสอนแทน', inG('G1', 'U111')).length === 0, 'no group chosen yet → no reply in groups');
+ok(rows_('สมาชิกไลน์').some(r => r[0] === 'U111' && r[2] === 'G1'), 'members still recorded (so admin can see groups)');
+say('แจ้งตารางสอนแทน', inG('GOTHER', 'UX'));
+
+// เลือกกลุ่มในหน้า admin
+const ag = post('getAdminData', [AP]).result;
+ok(ag.groups.length === 2 && ag.groups.find(g => g.groupId === 'G1').name === 'กลุ่มครู G1' && ag.groups.find(g => g.groupId === 'G1').seen === 1, 'admin sees groups seen by the bot (with names)');
+ok(post('setLineGroup', ['wrong', 'G1']).ok === false, 'setLineGroup needs the admin password');
+ok(post('setLineGroup', [AP, 'GNOPE']).ok === false, 'cannot pick a group the bot never saw');
+ok(post('setLineGroup', [AP, 'G1']).result === true && settings_()['LINE groupId'] === 'G1', 'admin picks the announce group');
+ok(post('linkTeacherLine', [AP, firstSub, 'U111']).result === true && teachers_().find(t => t.name === firstSub).userId === 'U111', 'admin links teacher to a LINE member');
+
+// เลือกกลุ่มแล้ว: ตอบเฉพาะกลุ่มนั้น เฉพาะข้อความ "แจ้งตารางสอนแทน" เป๊ะ ๆ
+let r = say('แจ้งตารางสอนแทน', inG('G1', 'U2'));
+ok(r.length === 1 && r[0].payload.messages[0].type === 'flex' && r[0].payload.messages[1].type === 'textV2', 'แจ้งตารางสอนแทน → Flex + textV2 (reply)');
+ok(r[0].payload.messages[1].substitution.t0.mentionee.userId === 'U111', 'mention substitution');
+['คำสั่ง', 'help', 'สอนแทน', 'สอนแทนพรุ่งนี้', 'แจ้งตารางสอนแทนพรุ่งนี้', 'ลงทะเบียน สมชาย', 'ตั้งกลุ่มนี้', 'แจ้งตารางสอนแทนครับ', 'สวัสดี'].forEach(t => {
+  ok(say(t, inG('G1', 'U2')).length === 0, 'other words are ignored: ' + t);
+});
+ok(settings_()['LINE groupId'] === 'G1', 'ตั้งกลุ่มนี้ no longer changes the group');
+ok(say('แจ้งตารางสอนแทน', inG('GOTHER', 'UX')).length === 0, 'other group: ignored');
+say('hi', inG('GOTHER', 'UZ'));
+ok(!rows_('สมาชิกไลน์').some(x => x[0] === 'UZ'), 'other group: members are not stored once a group is chosen');
+ok(say('แจ้งตารางสอนแทน', { type: 'room', roomId: 'R1', userId: 'U2' }).length === 0, 'rooms are ignored');
+r = say('แจ้งตารางสอนแทน', { type: 'user', userId: 'U2' });
+ok(r.length === 1 && r[0].payload.messages.length === 1 && r[0].payload.messages[0].type === 'flex', '1:1 chat: Flex only');
+globalThis.todayStr_ = (o) => new Date(Date.UTC(2026, 8, 28 + (o || 0) + 5)).toISOString().slice(0, 10);
+r = say('แจ้งตารางสอนแทน', inG('G1', 'U2'));
+ok(r.length === 1 && r[0].payload.messages[0].type === 'text' && r[0].payload.messages[0].text.indexOf('ยังไม่มีการจัดสอนแทน') >= 0, 'no assignment today → short text');
+globalThis.todayStr_ = () => date;
+ok(post('setLineGroup', [AP, '']).result === true && !settings_()['LINE groupId'], 'admin can clear the group');
+post('setLineGroup', [AP, 'G1']);
 
 const admin = post('getAdminData', [AP]).result;
 ok(admin.hasToken && admin.groupId === 'G1' && admin.sheetUrl && admin.webAppUrl, 'getAdminData (with sheet/web app URL)');
