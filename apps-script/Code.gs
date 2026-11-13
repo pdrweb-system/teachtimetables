@@ -750,27 +750,22 @@ function getAdminData(pw) {
     bot: bot,
     groupId: st[SET.GROUP] || '',
     groups: knownGroups_(hasToken),
+    lastEvent: PROP.getProperty('LAST_EVENT') || '',
+    lastMismatch: PROP.getProperty('LAST_MISMATCH') || '',
   };
 }
 
-/** กลุ่มที่บอทเคยเห็นสมาชิกพิมพ์ (จากชีตสมาชิกไลน์) พร้อมชื่อกลุ่มจาก LINE — ให้ผู้ดูแลเลือกกลุ่มรับประกาศ */
+/** กลุ่มที่บอทเคยเห็น event (จาก GROUPS_SEEN) พร้อมชื่อกลุ่มจาก LINE — ให้ผู้ดูแลเลือกกลุ่มรับประกาศ */
 function knownGroups_(withNames) {
-  const count = {};
-  const order = [];
-  rows_(SH.MEMBERS).forEach(function (r) {
-    const g = str_(r[2]);
-    if (!g) return;
-    if (!(g in count)) { count[g] = 0; order.push(g); }
-    count[g]++;
-  });
+  const seen = groupsSeen_();
   const cur = settings_()[SET.GROUP];
-  if (cur && !(cur in count)) { count[cur] = 0; order.push(cur); }
-  return order.map(function (g) {
+  if (cur && !(cur in seen)) seen[cur] = '';
+  return Object.keys(seen).sort(function (a, b) { return seen[b] < seen[a] ? -1 : (seen[b] > seen[a] ? 1 : 0); }).map(function (g) {
     let name = '';
     if (withNames) {
       try { name = lineApi_('/v2/bot/group/' + g + '/summary', null, 'get').groupName || ''; } catch (e) { /* ไม่ทราบชื่อ */ }
     }
-    return { groupId: g, name: name, seen: count[g] };
+    return { groupId: g, name: name, lastSeen: seen[g] };
   });
 }
 
@@ -848,7 +843,12 @@ function doPost(e) {
 function handleLineWebhook_(body) {
   try {
     const botId = PROP.getProperty('BOT_USER_ID');
-    if (botId && body.destination && body.destination !== botId) return ok_();
+    if (botId && body.destination && body.destination !== botId) {
+      noteDiag_('LAST_MISMATCH', 'destination ' + body.destination + ' ไม่ตรงกับบอทที่ใส่ Token ไว้');
+      return ok_();
+    }
+    const first = (body.events || [])[0];
+    if (first) noteDiag_('LAST_EVENT', (first.type || '?') + ' / ' + ((first.source || {}).type || '?'));
     (body.events || []).forEach(function (ev) {
       try { handleEvent_(ev); } catch (err) { console.error(err); }
     });
@@ -861,55 +861,48 @@ function handleLineWebhook_(body) {
 function ok_() { return ContentService.createTextOutput('OK'); }
 
 // บอทตัวเดียวอาจถูกใช้ร่วมกับระบบอื่น (ระบบเดิมส่งต่อ webhook มา) → event จากกลุ่มอื่นก็มาถึงที่นี่ด้วย
-// - ยังไม่ได้เลือกกลุ่มรับประกาศ: เก็บรายชื่อสมาชิกจากทุกกลุ่ม (ให้ผู้ดูแลเห็นกลุ่ม/ชื่อไลน์ในหน้า admin) แต่ไม่ตอบอะไร
-// - เลือกกลุ่มแล้ว (หน้า admin → setLineGroup): ทำงานเฉพาะกลุ่มนั้น กลุ่ม/ห้องอื่นถูกเมินทั้งหมด
+// - ทุกกลุ่มที่เห็น event จะถูกจดไว้ (GROUPS_SEEN) ให้ผู้ดูแลเลือกกลุ่มรับประกาศในหน้า admin
+//   (จดจาก groupId ของ event เอง ไม่พึ่ง userId เพราะ LINE ไม่ส่ง userId ของคนที่ยังไม่ยินยอม)
+// - ยังไม่ได้เลือกกลุ่ม: ไม่ตอบอะไรในกลุ่ม
+// - เลือกกลุ่มแล้ว (setLineGroup): ตอบเฉพาะกลุ่มนั้น กลุ่ม/ห้องอื่นถูกเมิน
 // - แชต 1:1 กับบอทตอบคำสั่งได้เสมอ
-// คำสั่งเดียวที่บอทตอบ: "แจ้งตารางสอนแทน" (ดู handleText_) — ไม่ทักทาย ไม่ตอบ join/ลงทะเบียน/ตั้งกลุ่ม ฯลฯ
+// คำสั่งเดียวที่บอทตอบ: "แจ้งตารางสอนแทน" (ดู handleText_) — ไม่ทักทาย ไม่ตอบ join ฯลฯ
 function handleEvent_(ev) {
   const src = ev.source || {};
-  const group = settings_()[SET.GROUP];
   if (src.type === 'room') return;
-  if (src.type === 'group' && group && src.groupId !== group) return;
-
-  if (src.userId) upsertMember_(src.groupId || '', src.userId, false);
-  if (ev.type === 'memberJoined' && ev.joined) {
-    (ev.joined.members || []).forEach(function (m) { if (m.userId) upsertMember_(src.groupId || '', m.userId, false); });
-  }
-  if (src.type === 'group' && !group) return;
+  if (src.type === 'group' && src.groupId) noteGroup_(src.groupId);
+  const group = settings_()[SET.GROUP];
+  if (src.type === 'group' && (!group || src.groupId !== group)) return;
   if (ev.type === 'message' && ev.message && ev.message.type === 'text') handleText_(ev);
+}
+
+// กลุ่มที่เคยเห็น event: { groupId: 'yyyy-MM-dd HH:mm:ss' (ล่าสุด) } เก็บใน Script Properties (เก็บไม่เกิน 20 กลุ่ม)
+function groupsSeen_() {
+  try { return JSON.parse(PROP.getProperty('GROUPS_SEEN') || '{}') || {}; } catch (e) { return {}; }
+}
+function noteGroup_(groupId) {
+  const cache = CacheService.getScriptCache();
+  if (cache.get('gs_' + groupId)) return; // จดแล้วในช่วงนี้ ไม่ต้องเขียนซ้ำทุกข้อความ
+  const all = groupsSeen_();
+  all[groupId] = nowStr_();
+  const ids = Object.keys(all).sort(function (a, b) { return all[b] < all[a] ? -1 : 1; }).slice(0, 20);
+  const keep = {};
+  ids.forEach(function (g) { keep[g] = all[g]; });
+  PROP.setProperty('GROUPS_SEEN', JSON.stringify(keep));
+  cache.put('gs_' + groupId, '1', 3600);
+}
+
+// บันทึกเหตุการณ์ล่าสุดไว้ให้หน้า admin ใช้ตรวจว่า LINE/ระบบเดิมส่ง event มาถึงหรือไม่ (เขียนไม่เกินนาทีละครั้ง)
+function noteDiag_(key, text) {
+  const cache = CacheService.getScriptCache();
+  if (cache.get('dg_' + key)) return;
+  PROP.setProperty(key, nowStr_() + ' — ' + text);
+  cache.put('dg_' + key, '1', 60);
 }
 
 function reply_(token, messages) {
   if (!token) return;
   lineApi_('/v2/bot/message/reply', { replyToken: token, messages: messages });
-}
-
-function upsertMember_(groupId, userId, force) {
-  const cache = CacheService.getScriptCache();
-  const ck = 'm_' + userId;
-  const cached = cache.get(ck);
-  if (cached && !force) return cached === '1' ? '' : cached;
-
-  let name = '';
-  try {
-    const p = groupId
-      ? lineApi_('/v2/bot/group/' + groupId + '/member/' + userId, null, 'get')
-      : lineApi_('/v2/bot/profile/' + userId, null, 'get');
-    name = p.displayName || '';
-  } catch (e) { /* ignore */ }
-
-  const sh = sheet_(SH.MEMBERS);
-  const vals = rows_(SH.MEMBERS);
-  let i = -1;
-  for (let k = 0; k < vals.length; k++) if (str_(vals[k][0]) === userId) { i = k; break; }
-  if (i >= 0) {
-    sh.getRange(i + 2, 1, 1, 4).setValues([[userId, name || vals[i][1], groupId || vals[i][2], nowStr_()]]);
-    name = name || str_(vals[i][1]);
-  } else {
-    sh.appendRow([userId, name, groupId, nowStr_()]);
-  }
-  cache.put(ck, name || '1', 21600);
-  return name;
 }
 
 /** คำสั่งเดียว: "แจ้งตารางสอนแทน" (ของวันนี้) → reply เป็น Flex + ข้อความแท็กชื่อผู้สอนแทน; ข้อความอื่นไม่ตอบ */

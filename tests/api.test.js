@@ -84,16 +84,19 @@ __lineCalls.length = 0;
 line([{ type: 'join', replyToken: 'r1', source: { type: 'group', groupId: 'G1' } }]);
 ok(!replies().length && !settings_()['LINE groupId'], 'join: no greeting, group not auto-set');
 ok(say('แจ้งตารางสอนแทน', inG('G1', 'U111')).length === 0, 'no group chosen yet → no reply in groups');
-ok(rows_('สมาชิกไลน์').some(r => r[0] === 'U111' && r[2] === 'G1'), 'members still recorded (so admin can see groups)');
+ok(Object.keys(groupsSeen_()).indexOf('G1') >= 0, 'group G1 is noted from the event (so admin can see it)');
+line([{ type: 'message', replyToken: 'rn', source: { type: 'group', groupId: 'GNOUID' }, message: { type: 'text', text: 'hi' } }]);
+ok(Object.keys(groupsSeen_()).indexOf('GNOUID') >= 0, 'group noted even when the event has no userId');
 say('แจ้งตารางสอนแทน', inG('GOTHER', 'UX'));
 
 // เลือกกลุ่มในหน้า admin
 const ag = post('getAdminData', [AP]).result;
-ok(ag.groups.length === 2 && ag.groups.find(g => g.groupId === 'G1').name === 'กลุ่มครู G1' && ag.groups.find(g => g.groupId === 'G1').seen === 1, 'admin sees groups seen by the bot (with names)');
+ok(ag.groups.length === 3 && ag.groups.find(g => g.groupId === 'G1').name === 'กลุ่มครู G1' && /^\d{4}-/.test(ag.groups.find(g => g.groupId === 'G1').lastSeen), 'admin sees groups seen by the bot (with names)');
 ok(post('setLineGroup', ['wrong', 'G1']).ok === false, 'setLineGroup needs the admin password');
 ok(post('setLineGroup', [AP, 'GNOPE']).ok === false, 'cannot pick a group the bot never saw');
 ok(post('setLineGroup', [AP, 'G1']).result === true && settings_()['LINE groupId'] === 'G1', 'admin picks the announce group');
 ok(!('teachers' in ag) && !('members' in ag), 'getAdminData no longer lists teachers/members (no linking)');
+ok(/\/ group$/.test(ag.lastEvent) && ag.lastMismatch === '', 'admin sees the last event received from LINE');
 
 // เลือกกลุ่มแล้ว: ตอบเฉพาะกลุ่มนั้น เฉพาะข้อความ "แจ้งตารางสอนแทน" เป๊ะ ๆ
 let r = say('แจ้งตารางสอนแทน', inG('G1', 'U2'));
@@ -104,8 +107,10 @@ ok(!JSON.stringify(r[0].payload).includes('mention'), 'no mention in the reply')
 });
 ok(settings_()['LINE groupId'] === 'G1', 'ตั้งกลุ่มนี้ no longer changes the group');
 ok(say('แจ้งตารางสอนแทน', inG('GOTHER', 'UX')).length === 0, 'other group: ignored');
-say('hi', inG('GOTHER', 'UZ'));
-ok(!rows_('สมาชิกไลน์').some(x => x[0] === 'UZ'), 'other group: members are not stored once a group is chosen');
+say('hi', inG('GNEW2', 'UZ'));
+ok(Object.keys(groupsSeen_()).indexOf('GNEW2') >= 0 && settings_()['LINE groupId'] === 'G1', 'new groups are still listed after one is chosen, without changing the choice');
+doPost({ postData: { contents: JSON.stringify({ destination: 'UWRONG', events: [{ type: 'message', replyToken: 'rw', source: { type: 'group', groupId: 'GW' }, message: { type: 'text', text: 'แจ้งตารางสอนแทน' } }] }) } });
+ok(PROP.getProperty('LAST_MISMATCH') && Object.keys(groupsSeen_()).indexOf('GW') < 0, 'events for another bot (wrong destination) are ignored and reported');
 ok(say('แจ้งตารางสอนแทน', { type: 'room', roomId: 'R1', userId: 'U2' }).length === 0, 'rooms are ignored');
 r = say('แจ้งตารางสอนแทน', { type: 'user', userId: 'U2' });
 ok(r.length === 1 && r[0].payload.messages.length === 1 && r[0].payload.messages[0].type === 'flex', '1:1 chat: Flex only');

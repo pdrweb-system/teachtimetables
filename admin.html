@@ -360,6 +360,8 @@ function renderLine(d) {
   $('#cfgLine').value = "apiUrl: '" + (apiUrl() || '') + "'";
   var html = '<div class="kv">' +
     '<div class="muted">บอท</div><div>' + (d.bot ? (d.bot.error ? '<span class="pill no">ผิดพลาด</span> ' + h(d.bot.error) : '<b>' + h(d.bot.name) + '</b> <span class="muted small">' + h(d.bot.basicId || '') + '</span>') : '<span class="pill no">ยังไม่ใส่ Token</span>') + '</div>' +
+    '<div class="muted">รับ event จาก LINE ล่าสุด</div><div>' + (d.lastEvent ? '<span class="pill ok">ได้รับแล้ว</span> <span class="small muted">' + h(d.lastEvent) + '</span>' : '<span class="pill no">ยังไม่เคยได้รับ</span> <span class="small muted">ตรวจ Webhook / การส่งต่อจากระบบเดิม</span>') + '</div>' +
+    (d.lastMismatch ? '<div class="muted">ปัญหา</div><div><span class="pill no">บอทไม่ตรง</span> <span class="small muted">' + h(d.lastMismatch) + ' — วาง Token ของบอทตัวที่ส่ง event มา</span></div>' : '') +
     '<div class="muted">กลุ่มรับประกาศ</div><div>' + (d.groupId ? '<span class="pill ok">เลือกแล้ว</span>' : '<span class="pill no">ยังไม่เลือก</span>') + '</div>' +
     '</div>' +
     '<div style="margin-top:14px"><div class="small muted">Webhook URL (นำไปวางใน LINE Developers)</div>' +
@@ -369,9 +371,10 @@ function renderLine(d) {
     '<div class="row"><input type="password" id="tokenInput" class="grow" autocomplete="off" placeholder="' + (d.hasToken ? '•••••• (บันทึกแล้ว — วางใหม่เพื่อเปลี่ยน)' : 'วาง token ที่นี่') + '">' +
     '<button class="btn sm pri" id="saveTokenBtn">บันทึก</button></div></div>' +
     '<h3 style="font-size:16px;margin:18px 0 4px">กลุ่มไลน์ที่ให้บอทตอบ</h3>' +
-    '<div class="muted small">บอทตอบคำสั่ง <code class="cmd">แจ้งตารางสอนแทน</code> เฉพาะกลุ่มที่เลือก (กลุ่มอื่นไม่ตอบ) กลุ่มจะโผล่ในรายการเมื่อมีคนพิมพ์อะไรก็ได้ในกลุ่มอย่างน้อย 1 ครั้ง</div>' +
+    '<div class="muted small">บอทตอบคำสั่ง <code class="cmd">แจ้งตารางสอนแทน</code> เฉพาะกลุ่มที่เลือก (กลุ่มอื่นไม่ตอบ) กลุ่มจะโผล่ในรายการเมื่อมีคนพิมพ์อะไรก็ได้ในกลุ่มอย่างน้อย 1 ครั้ง (แล้วกด ↻ รีเฟรช)</div>' +
+    ((d.groups || []).length ? '' : '<div class="small" style="color:var(--err);margin-top:6px">ยังไม่เห็นกลุ่มไหนเลย — ดูแถว “รับ event จาก LINE ล่าสุด” ด้านบน: ถ้ายังไม่เคยได้รับ แปลว่า event ยังส่งมาไม่ถึงระบบนี้ (ตรวจ Webhook ใน LINE Developers หรือการส่งต่อจากระบบเดิม และตั้ง Deploy เป็น “ทุกคน”)</div>') +
     '<select id="groupSel" style="margin-top:8px"><option value="">— ยังไม่เลือก —</option>' + (d.groups || []).map(function (g) {
-      return '<option value="' + h(g.groupId) + '"' + (g.groupId === d.groupId ? ' selected' : '') + '>' + h((g.name || 'กลุ่มที่ไม่ทราบชื่อ') + ' (เห็น ' + g.seen + ' คน)') + '</option>';
+      return '<option value="' + h(g.groupId) + '"' + (g.groupId === d.groupId ? ' selected' : '') + '>' + h((g.name || 'กลุ่มที่ไม่ทราบชื่อ') + (g.lastSeen ? ' · เห็นล่าสุด ' + g.lastSeen.slice(0, 16) : '')) + '</option>';
     }).join('') + '</select>' +
     '<button class="link" id="loadLineBtn">↻ รีเฟรช</button>';
   $('#lineBox').innerHTML = html;

@@ -32,6 +32,8 @@ function fontFile(weight) {
     return require.resolve('@fontsource/sarabun/files/sarabun-thai-' + weight + '-normal.woff2', { paths: [process.cwd(), __dirname] });
   } catch (e) { return null; }
 }
+// config.js จริงของ repo อาจมี URL ของผู้ใช้อยู่ → ในเทสต์เสิร์ฟค่าว่างเป็นค่าเริ่มต้น (ตอนท้ายมีเทสต์ที่ตั้งค่าเอง)
+globalThis.__configJs = "window.APP_CONFIG = { apiUrl: '' };";
 const lineEvent = (events) => doPost({ postData: { contents: JSON.stringify({ destination: 'UBOT', events }) } });
 
 (async () => {
@@ -270,7 +272,7 @@ const lineEvent = (events) => doPost({ postData: { contents: JSON.stringify({ de
     await page.click('#loginBtn');
     await page.waitForSelector('#adminBox', { state: 'visible' });
     ok((await page.textContent('#cfgState')).indexOf('ตั้งไว้กลางแล้ว') >= 0 && await page.isHidden('#cfgHow'), 'config.js: หน้า admin แสดงว่าตั้งกลางแล้ว');
-    globalThis.__configJs = null;
+    globalThis.__configJs = "window.APP_CONFIG = { apiUrl: '' };";
 
     ok(log.preflight === 0, 'ไม่มี CORS preflight');
     ok(log.api.filter((c) => c.method === 'POST').every((c) => /^text\/plain/.test(c.contentType || '')), 'POST ทุกครั้งเป็น text/plain');
