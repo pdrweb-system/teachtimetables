@@ -7,5 +7,5 @@
 // ถ้า URL หลุด ให้ Deploy ใหม่เพื่อได้ URL ใหม่ แล้วแก้ในไฟล์นี้
 // ถ้าเว้นว่างไว้ แต่ละเครื่องต้องกรอกเองครั้งแรก (แท็บ เพิ่มเติม) และจำไว้ในเครื่องนั้น
 window.APP_CONFIG = {
-  apiUrl: ''
+  apiUrl: 'https://script.google.com/macros/s/AKfycbwur-LvsHuckdjsBaDqzieZO6JiND-kIMepYKzmxPqPUzk6DTrHyA1lu4N0pn7jeKvN/exec'
 };
