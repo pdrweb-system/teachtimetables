@@ -37,9 +37,11 @@ LINE ──webhook POST {destination,events}──► /exec เดียวก�
 | `tests/gasmock.js` | Mock ของ SpreadsheetApp/DriveApp/UrlFetchApp/ฯลฯ ในหน่วยความจำ ให้รัน Code.gs ใน Node ได้ |
 | `tests/api.test.js` | ทดสอบ API ผ่าน doGet/doPost แบบเดียวกับที่ index.html เรียก — `node tests/api.test.js` |
 | `tests/flex.test.js` | ทดสอบคำสั่ง `แจ้งตารางสอนแทน` + ตัวตรวจ Flex (property/ค่า/ขนาด) — `node tests/flex.test.js [--dump]` |
+| `tests/import.test.js` | ทดสอบตัวอ่าน PDF กับ `tests/fixtures/timetable-sample.pdf` (ข้อมูลสมมติ สร้างด้วย `tests/fixtures/make_timetable_pdf.py` + reportlab; commit ผลลัพธ์ไว้) — `REAL_PDF=ไฟล์ node tests/import.test.js` ลองกับไฟล์จริง (ห้าม commit ไฟล์จริง) |
 | `tests/e2e.test.js` | ทดสอบหน้าเว็บทั้ง flow ใน Chromium กับ Code.gs จริง — `node tests/e2e.test.js [โฟลเดอร์ภาพ]` |
 | `README.md` | คู่มือผู้ใช้ (ภาษาไทย) สำหรับสถาปัตยกรรมปัจจุบัน: ติดตั้ง, Deploy, GitHub Pages, LINE, อัปเดตจากเวอร์ชันเดิม, FAQ |
 | `config.js` | ตั้งค่ากลาง `window.APP_CONFIG = { apiUrl }` — โหลดก่อนสคริปต์หลักทั้ง index.html และ admin.html (ห้ามใส่ความลับ: เป็นไฟล์สาธารณะ) |
+| `timetable-import.js` | ตัวอ่านตารางสอนจาก PDF (UMD ES5, ไม่ผูก DOM): `parsePage(items)` อ่านทีละหน้าด้วยตำแหน่ง x/y จาก pdf.js, `build(pages, opts)` รวมเป็นแถว+คาบ+ครู+คำเตือน, `matchTeacher`, `cleanTeacher`, `fromPdfItems` — ใช้ทั้งหน้า admin และเทสต์ Node |
 | `.nojekyll` | ปิด Jekyll ของ GitHub Pages (ดูข้อควรระวัง) |
 | `docs/SETUP-legacy-htmlservice.md` | คู่มือติดตั้งเวอร์ชันเดิม (HtmlService) — เก็บไว้อ้างอิง; คู่มือปัจจุบันคือ `README.md` |
 | `docs/sample-output.jpg` | ตัวอย่างภาพตารางสอนแทนที่ระบบสร้าง |
@@ -50,6 +52,7 @@ LINE ──webhook POST {destination,events}──► /exec เดียวก�
 - เวอร์ชันแรก (Apps Script HtmlService: `Code.gs` + `Index.html`) ทำครบทุกฟีเจอร์ ทดสอบด้วย mock แล้ว
 - แปลงเป็น GitHub Pages + API: `index.html` push ขึ้น repo แล้ว (commit `4cc1957`, 2026-09-27) — แทน `google.script.run` ด้วย `fetch()` และมีช่องกรอก URL API ในแท็บตั้งค่า
 - `apps-script/Code.gs` เวอร์ชัน API อยู่ในโฟลเดอร์นี้ ผ่าน `tests/api.test.js` 19 ข้อ (เวอร์ชันนี้สร้างใหม่ให้ตรงกับ index.html — **ถ้าใน Apps Script ของผู้ใช้มี Code.gs ที่แก้เองไว้ ให้เทียบกับตัวนั้นก่อนทับ**)
+- 2026-11-13: นำเข้าตารางสอนจาก PDF ในหน้า admin (timetable-import.js + importTimetable); เทสต์ API 73, import 22 (23 กับไฟล์จริง), e2e 51; แก้บั๊กหน้า admin เรียก getInitData ด้วย POST — ต้องวาง Code.gs ใหม่ + Deploy เวอร์ชันใหม่
 - 2026-11-13: แก้ "กลุ่มไลน์ที่ให้บอทตอบ" ไม่ขึ้นให้เลือก (จดกลุ่มจาก event ไม่พึ่ง userId + แสดงสถานะ event ล่าสุดใน admin); เทสต์ API 59, Flex 32, e2e 41
 - 2026-11-13: ใส่ URL API ครั้งเดียวใน `config.js` (ไม่ต้องกรอกทุกเครื่อง); e2e 41 ข้อ
 - 2026-11-13: เอาการผูกชื่อครู/แท็กชื่อออก (reply เป็น Flex อย่างเดียว); เทสต์ API 56, Flex 32, e2e 36
@@ -66,6 +69,17 @@ LINE ──webhook POST {destination,events}──► /exec เดียวก�
 4. วาง URL `/exec` ใน `config.js` (`apiUrl`) ครั้งเดียวแล้ว Commit — ทุกเครื่องใช้ร่วมกัน (หน้า admin มีกล่อง "ตั้งให้ทุกเครื่อง" สร้างบรรทัดให้); ทางเลือก: กรอกต่อเครื่องในแท็บ เพิ่มเติม
 5. ตรวจ Webhook URL ใน LINE Developers Console ให้เป็น `/exec` เดียวกัน
 6. ถ้าเคยมี UI เดิมใน Apps Script ให้ลบไฟล์ `Index` ออก (doGet ไม่ใช้แล้ว)
+
+## นำเข้าตารางสอนจาก PDF (admin.html → การ์ด "นำเข้าตารางสอนจาก PDF")
+
+- อ่านใน**เบราว์เซอร์**ด้วย pdf.js 3.11.174 จาก cdnjs (โหลดตอนเลือกไฟล์เท่านั้น; ไม่ส่งไฟล์ไปเซิร์ฟเวอร์) → `TimetableImport.parsePage/build` → ตัวอย่างให้ผู้ดูแลตรวจ → `importTimetable` (ผู้ดูแลเท่านั้น)
+- **ไฟล์ตัวอย่างจริงของโรงเรียน (ผู้ใช้ส่งมา 2026-11-13, 21 หน้า จาก Word)**: หน้า 1–7 ตารางรายชั้น (ป.1/1 … ป.6; ช่อง = วิชา + "ครูชื่อสั้น"), หน้า 8–19 ตารางรายครู 12 คน (หัว `ตารางสอน <คำนำหน้า><ชื่อ> <นามสกุล>`, ช่อง = วิชา(ย่อ เช่น "คณิต","การงาน") + ห้อง, มีคอลัมน์ PLC 15.30–16.30 ที่ไม่มีห้อง), หน้า 20 "ตารางว่าง" (ผังอื่น — ข้าม), หน้า 21 ปก; ผลอ่าน: 231 คาบ / 12 ครู / คาบ 08:30–15:30 (6 คาบ ข้ามพักเที่ยง) ; เทียบรายชั้น↔รายครูเจอ 2 จุดที่ไฟล์ขัดกันเอง (ป.5 จันทร์ 12:30 รายชั้นเป็นครู ก. แต่รายครูเป็นครู ข.; ป.5 พฤหัสบดี 13:30 รายชั้นเป็นครู ค. แต่หน้ารายครูของ ค. ไม่มีช่องนั้น) — ยืนยันจากภาพหน้า ป.5 แล้วว่าเป็นข้อมูลต้นฉบับ ไม่ใช่บั๊กตัวอ่าน
+- วิธีอ่าน: ตำแหน่งข้อความ (ไม่เดาจากข้อความล้วน) — หัวคอลัมน์จากเวลา `h.mm`, แถวจากป้าย "วัน…" ซ้ายสุด, ข้อความแนวตั้ง (transform หมุน) = คอลัมน์พัก, ช่อง = บรรทัดบน..ล่าง (หน้ารายครู: บรรทัดสุดท้ายเป็นห้อง; รายชั้น: บรรทัดสุดท้ายเป็นครู); ชิ้นข้อความที่แตกเป็นหลายส่วน (เช่น "ป.1","/","1") รวมกันตามช่องว่าง ≤ 2.5pt; เวลาที่ติดกันเป็น item เดียว ("8.30 - 9.30") แยกตามสัดส่วนตำแหน่ง
+- **คาบ** = ช่วงเวลาที่มีข้อมูลจริง เรียงตามเวลาเริ่ม (คอลัมน์พักที่ว่างจึงไม่ถูกนับ; ช่วงที่ไม่มีใครสอนเลยก็ไม่ถูกนับ)
+- ช่องที่ไม่มีห้อง (PLC) ข้ามเป็นค่าเริ่มต้น (`skipNoRoom`) — ถ้านำเข้าด้วย จะเป็นคาบ "ครูไม่ว่าง" และปรากฏเป็นคาบที่ต้องหาคนสอนแทนเมื่อครูลา
+- ชื่อครู: `นางสาวสมศรี รักเรียน` → ชื่อ `ครูสมศรี รักเรียน` / แสดง `ครูสมศรี`; `matchTeacher` จับคู่ชื่อที่มีในชีต (ตรงตัว → ตัดคำนำหน้า/ช่องว่าง → ชื่อต้นถ้ามีคนเดียว) ไม่เดาถ้าชื่อต้นซ้ำ; กลุ่มสาระเดาจากวิชาที่สอนบ่อยสุด (ไม่นับ Homeroom/ชุมนุม/PLC ฯลฯ)
+- ข้อจำกัด: ต้องเป็น PDF ที่เลือกข้อความได้ (สแกน = ไม่มีข้อความ → ไม่พบตาราง; ยังไม่มี OCR); ผังที่ไม่ใช่ "หัวเวลาด้านบน + วันด้านซ้าย" (เช่น "ตารางว่าง") อ่านไม่ได้ — เพิ่มผังใหม่ใน `parsePage` พร้อมไฟล์ตัวอย่าง
+- PDF ที่สร้างด้วย Chromium/Skia (`page.pdf`) ให้ pdf.js อ่านสระ/วรรณยุกต์ไทยเพี้ยน (`\u0000`) — อย่าใช้ทำ fixture; ใช้ reportlab (ดู `tests/fixtures/make_timetable_pdf.py`)
 
 ## ฐานข้อมูล (Google Sheets) — `setup()` สร้างให้พร้อมข้อมูลตัวอย่าง
 
@@ -96,6 +110,7 @@ Script Properties: `SS_ID`, `FOLDER_ID` (โฟลเดอร์ Drive "ภา�
 | `setAdminPassword` | POST | `newPw, oldPw?` | ยังไม่มีรหัส = ตั้งครั้งแรก (ใครก็ได้ — ผู้ดูแลต้องตั้งทันทีหลัง Deploy); มีแล้ว = ต้องส่ง oldPw; ยาว ≥ 6 |
 | `verifyAdmin` | POST | `pw` | |
 | `setLineGroup` | POST | `pw, groupId` | เลือก/ล้างกลุ่มรับประกาศ (ต้องเป็นกลุ่มที่บอทเคยเห็น) |
+| `importTimetable` | POST | `pw, payload` | นำเข้าตารางสอนจาก PDF: payload `{rows[{teacher,day,period,subject,room}], mode:'replace'\|'append', addTeachers[{name,display,dept}], periods[{p,start,end}]\|null, deactivateOthers}`; ตรวจครู/วัน/คาบ/ซ้ำ, replace สำรองตารางเดิมไว้ชีต `สำรองตารางสอน` (ครั้งล่าสุดเท่านั้น), ใช้ LockService |
 | `getAdminData` | POST | `pw` | ข้อมูลบอท, กลุ่มที่เลือก + `groups` ที่เห็น, sheetUrl, webAppUrl (ไม่มีรายชื่อครู/สมาชิกแล้ว) |
 | `saveLineToken` | POST | `pw, token` | ตรวจ token ด้วย `/v2/bot/info` ก่อนบันทึก, เก็บ `BOT_USER_ID` |
 
@@ -141,7 +156,7 @@ Script Properties: `SS_ID`, `FOLDER_ID` (โฟลเดอร์ Drive "ภา�
 
 ## การทดสอบ
 
-- `node tests/api.test.js` และ `node tests/flex.test.js` — ต้องผ่านทุกข้อก่อน commit การแก้ Code.gs
+- `node tests/api.test.js`, `node tests/flex.test.js` และ `node tests/import.test.js` (ต้อง `npm i pdfjs-dist@3.11.174` ในโฟลเดอร์ที่รัน — ไม่มีก็ข้ามส่วนที่ใช้ PDF) — ต้องผ่านทุกข้อก่อน commit การแก้ Code.gs/timetable-import.js; e2e (`pdfjs-dist` ใช้ทดสอบนำเข้า PDF ในเบราว์เซอร์โดยดัก cdnjs มาเสิร์ฟไฟล์ใน node_modules)
 - `node tests/e2e.test.js [โฟลเดอร์ภาพ]` — ทดสอบหน้าเว็บทั้ง flow (ตั้ง URL → เพิ่มครู → จัดอัตโนมัติ → ภาพ → หน้าผู้ดูแล: ตั้งรหัส/เข้า-ออก/เปลี่ยนรหัส/LINE → ส่งไลน์ → สถิติ) บน viewport 390×844 กับ Code.gs จริง; ให้รันทุกครั้งที่แก้ index.html หรือ Code.gs ใส่โฟลเดอร์ภาพเพื่อดู `preview.jpg`/screenshot
   - หน้าเว็บกับ API ใช้ http server ในเครื่องคนละ origin; API ตอบ 302 ไป `/macros/echo` แบบ Apps Script และตอบ OPTIONS ด้วย 405 (จับ CORS preflight ได้)
   - ใช้ server จริงแทน `page.route` เพราะ Playwright route **ไม่ดักคำขอที่ตามหลัง redirect** (คำขอ echo จะหลุดออกเน็ตแล้วล้ม)

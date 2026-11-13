@@ -97,6 +97,13 @@ const lineEvent = (events) => doPost({ postData: { contents: JSON.stringify({ de
     return route.fulfill({ contentType: 'font/woff2', headers: { 'Access-Control-Allow-Origin': '*' },
       body: fs.readFileSync(fontFile(url.split('/').pop().split('.')[0])) });
   });
+  let pdfjsDir = null;
+  try { pdfjsDir = path.dirname(require.resolve('pdfjs-dist/build/pdf.min.js', { paths: [process.cwd(), __dirname] })); } catch (e) { /* ไม่มี pdfjs-dist → ข้ามเทสต์นำเข้า PDF */ }
+  await context.route(/^https:\/\/cdnjs\.cloudflare\.com\/ajax\/libs\/pdf\.js\/3\.11\.174\//, (route) => {
+    const f = route.request().url().split('/').pop();
+    if (!pdfjsDir || !fs.existsSync(path.join(pdfjsDir, f))) return route.abort();
+    return route.fulfill({ contentType: 'text/javascript', headers: { 'Access-Control-Allow-Origin': '*' }, body: fs.readFileSync(path.join(pdfjsDir, f)) });
+  });
   const page = await context.newPage();
   page.on('pageerror', (e) => log.errors.push('pageerror: ' + e.message));
   page.on('console', (m) => { if (m.type() === 'error') log.errors.push('console: ' + m.text()); });
@@ -213,6 +220,34 @@ const lineEvent = (events) => doPost({ postData: { contents: JSON.stringify({ de
     ok(await page.$('select[data-teacher]') === null, 'ไม่มีส่วนผูกชื่อครูกับไลน์');
     ok(await page.$eval('#lineBox input[readonly]', (i) => i.value) === API, 'Webhook URL = URL /exec ที่หน้าเว็บใช้อยู่');
     ok((await page.$eval('#cfgLine', (i) => i.value)) === "apiUrl: '" + API + "'" && await page.isVisible('#cfgHow'), 'หน้า admin สร้างบรรทัด apiUrl ให้ไปวางใน config.js');
+    // ── นำเข้าตารางสอนจาก PDF (อ่านในเบราว์เซอร์ด้วย pdf.js → ตัวอย่าง → บันทึกลงชีต) ──
+    if (pdfjsDir) {
+      const before = rows_('ตารางสอน').filter((r) => r[0]).length;
+      await page.setInputFiles('#impFile', path.join(ROOT, 'tests/fixtures/timetable-sample.pdf'));
+      await page.waitForSelector('#impGo', { timeout: 30000 });
+      const prev = await page.textContent('#impPreview');
+      ok(/ตารางรายครู 2 · ตารางรายชั้น 3 · ข้าม \(ไม่ใช่ตาราง\) 1/.test(prev) && prev.indexOf('7 คาบ') >= 0 && prev.indexOf('2 ครู') >= 0, 'นำเข้า PDF: สรุปจำนวนหน้า/คาบ/ครู');
+      ok(prev.indexOf('ตารางรายครูกับรายชั้นในไฟล์ไม่ตรงกัน') >= 0 && prev.indexOf('ครูวิรัตน์') >= 0, 'นำเข้า PDF: เตือนจุดที่ตารางรายชั้นขัดกับรายครู (หน้า ป.2 ชุดที่จงใจแก้)');
+      ok(prev.indexOf('ครูสมศรี รักเรียน') >= 0 && (await page.$$eval('#impPreview td span.pill', (x) => x.filter((e) => e.textContent === 'เพิ่มใหม่').length)) === 2, 'นำเข้า PDF: ครูทั้งสองเป็น "เพิ่มใหม่" (ไม่มีในชีต)');
+      await page.selectOption('#impView', 'ครูสมศรี รักเรียน');
+      ok((await page.$$eval('#impPreview table', (t) => t[t.length - 1].textContent)).indexOf('ศิลปะ ดนตรี') >= 0, 'นำเข้า PDF: ตารางตัวอย่างรายครูแสดงวิชา');
+      await page.locator('#impBox').scrollIntoViewIfNeeded();
+      await shot('import-preview.png');
+      ok(await page.evaluate(() => document.documentElement.scrollWidth) === 390, 'นำเข้า PDF: หน้าตัวอย่างไม่ล้นจอ 390px');
+      await page.check('#optDeact');
+      await page.click('#impGo'); // confirm() ถูกตอบตกลงอัตโนมัติ
+      await toastHas('นำเข้าแล้ว');
+      await idle();
+      const tt = rows_('ตารางสอน').filter((r) => r[0]);
+      ok(tt.length === 7 && tt.every((r) => /^ครู(สมศรี รักเรียน|วิรัตน์ ขยันดี)$/.test(r[0])) && tt.some((r) => r[1] === 'พฤหัสบดี' && r[2] === 5 && r[3] === 'ชุมนุม' && r[4] === 'ป.2'), 'นำเข้า PDF: ตารางสอนในชีตถูกแทนที่ด้วย 7 คาบจากไฟล์ (เดิม ' + before + ')');
+      ok(__book.getSheetByName('สำรองตารางสอน') && __book.getSheetByName('สำรองตารางสอน').getLastRow() === before + 1, 'นำเข้า PDF: สำรองตารางเดิมไว้');
+      ok(teachers_().filter((t) => t.active).length === 2 && teachers_().some((t) => t.name === 'ครูสมศรี รักเรียน' && t.display === 'ครูสมศรี'), 'นำเข้า PDF: เพิ่มครูใหม่ + ปิดใช้งานครูตัวอย่าง');
+      ok(periods_().length === 5 && periods_()[3].start === '12:30', 'นำเข้า PDF: เวลาคาบถูกแทนที่');
+      ok(await page.isHidden('#impPreview') && (await page.textContent('#impStatus')).indexOf('นำเข้าเรียบร้อย') >= 0, 'นำเข้า PDF: หลังนำเข้าแสดงผลสำเร็จ');
+    } else {
+      console.log('  (ข้ามเทสต์นำเข้า PDF: ไม่พบ pdfjs-dist — npm i pdfjs-dist@3.11.174)');
+    }
+
     await page.fill('#oldPw', 'secret1');
     await page.fill('#chPw', 'secret2');
     await page.fill('#chPw2', 'secret2');
@@ -281,6 +316,7 @@ const lineEvent = (events) => doPost({ postData: { contents: JSON.stringify({ de
   } catch (e) {
     console.error('ไม่ผ่าน: ' + e.message);
     if (log.errors.length) console.error(log.errors.join('\n'));
+    try { const st = await page.textContent('#impStatus', { timeout: 500 }); if (st) console.error('สถานะนำเข้า PDF: ' + st); } catch (e2) { /* ไม่ได้อยู่หน้า admin */ }
     await shot('fail.png');
     process.exitCode = 1;
   } finally {

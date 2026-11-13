@@ -125,5 +125,33 @@ const admin = post('getAdminData', [AP]).result;
 ok(admin.hasToken && admin.groupId === 'G1' && admin.sheetUrl && admin.webAppUrl, 'getAdminData (with sheet/web app URL)');
 ok(get('getStats', ['2026-09']).result.dates.length === 1, 'getStats');
 
+// นำเข้าตารางสอน (จาก PDF → ผู้ดูแลตรวจ → ส่งมาบันทึก)
+const imp = (payload, pw) => post('importTimetable', [pw === undefined ? AP : pw, payload]);
+const ttRows = () => rows_('ตารางสอน').filter(r => r[0]);
+const base = [
+  { teacher: 'ครูสมศรี รักเรียน', day: 'จันทร์', period: 1, subject: 'ภาษาไทย', room: 'ป.1/1' },
+  { teacher: 'ครูสมศรี รักเรียน', day: 'จันทร์', period: 2, subject: 'คณิต', room: 'ป.2' },
+  { teacher: 'ครูสมชาย ใจดี', day: 'พฤหัส', period: 3, subject: 'วิทย์', room: 'ป.3' },
+];
+ok(imp({ rows: base }, 'wrong').ok === false && ttRows().length > 3, 'importTimetable needs the admin password (nothing changed)');
+ok(imp({ rows: [] }).ok === false, 'import: empty rows rejected');
+ok(imp({ rows: base }).error.indexOf('ไม่พบครู') >= 0, 'import: unknown teacher rejected unless added');
+ok(imp({ rows: [{ teacher: 'ครูสมชาย ใจดี', day: 'วันเสาร์ที่', period: 1 }] }).error.indexOf('วันไม่ถูกต้อง') >= 0, 'import: invalid day rejected');
+ok(imp({ rows: [{ teacher: 'ครูสมชาย ใจดี', day: 'จันทร์', period: 0 }] }).error.indexOf('คาบไม่ถูกต้อง') >= 0, 'import: invalid period rejected');
+ok(imp({ rows: [base[2], base[2]] }).error.indexOf('สองรายการ') >= 0, 'import: duplicate teacher/day/period rejected');
+const before = ttRows().length;
+ok(imp({ rows: base, mode: 'replace', addTeachers: [{ name: 'ครูสมศรี รักเรียน', display: 'ครูสมศรี', dept: 'ภาษาไทย' }], deactivateOthers: true,
+  periods: [{ p: 1, start: '8:30', end: '9:30' }, { p: 2, start: '09:30', end: '10:30' }] }).result.rows === 3, 'import: replace succeeds');
+ok(ttRows().length === 3 && ttRows().every(r => r[1] === 'จันทร์' || r[1] === 'พฤหัสบดี'), 'import: timetable replaced, day names normalised (พฤหัส → พฤหัสบดี)');
+const bk = __book.getSheetByName('สำรองตารางสอน');
+ok(bk && bk.getLastRow() === before + 1, 'import: previous timetable backed up (' + before + ' rows)');
+const tch = teachers_();
+ok(tch.find(t => t.name === 'ครูสมศรี รักเรียน' && t.display === 'ครูสมศรี' && t.dept === 'ภาษาไทย' && t.active), 'import: new teacher added with display name and group');
+ok(tch.filter(t => t.active).length === 2 && !tch.find(t => t.name === 'ครูมาลี ศรีสุข').active, 'import: teachers not in the new timetable deactivated');
+ok(periods_().length === 2 && periods_()[0].start === '08:30', 'import: periods replaced (times padded to HH:mm)');
+const d2 = get('getDateData', ['2026-09-28']).result;
+ok(d2.timetable.length === 2 && d2.timetable.some(x => x.teacher === 'ครูสมศรี รักเรียน' && x.room === 'ป.1/1'), 'import: new timetable is what the planner sees');
+ok(imp({ rows: [{ teacher: 'ครูสมชาย ใจดี', day: 'อังคาร', period: 4, subject: 'ศิลปะ', room: 'ป.4' }], mode: 'append' }).result.rows === 1 && ttRows().length === 4, 'import: append adds rows without removing');
+
 ok(pushes === 0, 'the system never pushes (reply only)');
 console.log('ผ่านทั้งหมด ' + passed + ' ข้อ');

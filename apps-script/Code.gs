@@ -65,6 +65,7 @@ const POST_API = {
   getAdminData: getAdminData,
   saveLineToken: saveLineToken,
   setLineGroup: setLineGroup,
+  importTimetable: importTimetable,
 };
 
 function doGet(e) {
@@ -794,6 +795,105 @@ function saveLineToken(pw, token) {
     if (old) PROP.setProperty('LINE_TOKEN', old); else PROP.deleteProperty('LINE_TOKEN');
     throw new Error('Token ใช้ไม่ได้: ' + e.message);
   }
+}
+
+// ───────────────────────── นำเข้าตารางสอน (ผู้ดูแลเท่านั้น) ─────────────────────────
+/**
+ * นำเข้าตารางสอนที่อ่านจาก PDF (หน้า admin อ่านไฟล์ในเบราว์เซอร์ แล้วส่งแถวที่ผู้ดูแลตรวจแล้วมาที่นี่)
+ * payload: { rows:[{teacher,day,period,subject,room}], mode:'replace'|'append',
+ *            addTeachers:[{name,display,dept}] (ครูใหม่ที่จะเพิ่มลงชีต "ครู"),
+ *            periods:[{p,start,end}] | null (ถ้าส่งมา = แทนที่ชีต "คาบเรียน"),
+ *            deactivateOthers:boolean (เฉพาะ replace: ปิดใช้งานครูที่ไม่อยู่ในตารางใหม่) }
+ * replace จะสำรองตารางเดิมไว้ในชีต "สำรองตารางสอน" ก่อน (เก็บแค่ครั้งล่าสุด)
+ */
+function importTimetable(pw, payload) {
+  adminGuard_(pw);
+  payload = payload || {};
+  const rows = payload.rows || [];
+  if (!rows.length) throw new Error('ไม่มีข้อมูลตารางสอนให้นำเข้า');
+  if (rows.length > 3000) throw new Error('ข้อมูลมากเกินไป (เกิน 3,000 แถว)');
+  const mode = payload.mode === 'append' ? 'append' : 'replace';
+
+  const have = {};
+  teachers_().forEach(function (t) { have[t.name] = true; });
+  const toAdd = [];
+  (payload.addTeachers || []).forEach(function (t) {
+    const name = str_(t.name);
+    if (!name || have[name]) return;
+    if (name.length > 100) throw new Error('ชื่อครูยาวเกินไป: ' + name);
+    have[name] = true;
+    toAdd.push([name, str_(t.display) || name, str_(t.dept).slice(0, 100), '', '', true]);
+  });
+
+  const seen = {};
+  const used = {};
+  const clean = rows.map(function (r, i) {
+    const teacher = str_(r.teacher);
+    if (!have[teacher]) throw new Error('แถวที่ ' + (i + 1) + ': ไม่พบครู "' + teacher + '" ในชีต (ต้องเพิ่มครูใหม่ด้วย)');
+    const day = normDay_(r.day);
+    if (DAYS.indexOf(day) < 0) throw new Error('แถวที่ ' + (i + 1) + ': วันไม่ถูกต้อง "' + str_(r.day) + '"');
+    const period = Number(r.period);
+    if (!(period >= 1 && period <= 20 && period % 1 === 0)) throw new Error('แถวที่ ' + (i + 1) + ': คาบไม่ถูกต้อง "' + str_(r.period) + '"');
+    const k = teacher + '|' + day + '|' + period;
+    if (seen[k]) throw new Error(teacher + ' มีสองรายการในวัน' + day + ' คาบ ' + period);
+    seen[k] = true;
+    used[teacher] = true;
+    return [teacher, day, period, str_(r.subject).slice(0, 100), str_(r.room).slice(0, 50)];
+  });
+
+  let periodRows = null;
+  if (payload.periods && payload.periods.length) {
+    const ps = {};
+    periodRows = payload.periods.map(function (x) {
+      const p = Number(x.p);
+      const st = str_(x.start).replace('.', ':'), en = str_(x.end).replace('.', ':');
+      if (!(p >= 1 && p <= 20 && p % 1 === 0) || ps[p]) throw new Error('เลขคาบในรายการเวลาไม่ถูกต้อง/ซ้ำ');
+      if (!/^\d{1,2}:\d{2}$/.test(st) || !/^\d{1,2}:\d{2}$/.test(en)) throw new Error('รูปแบบเวลาไม่ถูกต้อง (คาบ ' + p + ')');
+      ps[p] = true;
+      const pad = function (v) { return v.length < 5 ? '0' + v : v; };
+      return [p, pad(st), pad(en)];
+    }).sort(function (a, b) { return a[0] - b[0]; });
+  }
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  let deactivated = 0;
+  try {
+    const tt = sheet_(SH.TIMETABLE);
+    const n = tt.getLastRow();
+    if (mode === 'replace') {
+      // สำรองของเดิมก่อนทับ
+      const ss = ss_();
+      let bk = ss.getSheetByName('สำรองตารางสอน');
+      if (!bk) bk = ss.insertSheet('สำรองตารางสอน');
+      const bn = bk.getLastRow();
+      if (bn > 0) bk.getRange(1, 1, bn, 7).clearContent();
+      bk.getRange(1, 1, 1, 7).setValues([HEADERS[SH.TIMETABLE].concat(['', 'สำรองเมื่อ'])]);
+      bk.getRange(2, 7, 1, 1).setValues([[nowStr_()]]);
+      if (n > 1) bk.getRange(2, 1, n - 1, 5).setValues(tt.getRange(2, 1, n - 1, 5).getValues());
+      if (n > 1) tt.getRange(2, 1, n - 1, 5).clearContent();
+    }
+    if (toAdd.length) {
+      const ts = sheet_(SH.TEACHERS);
+      ts.getRange(ts.getLastRow() + 1, 1, toAdd.length, 6).setValues(toAdd);
+    }
+    const start = mode === 'replace' ? 2 : Math.max(tt.getLastRow(), 1) + 1;
+    tt.getRange(start, 1, clean.length, 5).setValues(clean);
+    if (mode === 'replace' && payload.deactivateOthers) {
+      teachers_().forEach(function (t) {
+        if (!used[t.name] && t.active) { sheet_(SH.TEACHERS).getRange(t.row, 6).setValue(false); deactivated++; }
+      });
+    }
+    if (periodRows) {
+      const pr = sheet_(SH.PERIODS);
+      const pn = pr.getLastRow();
+      if (pn > 1) pr.getRange(2, 1, pn - 1, 3).clearContent();
+      pr.getRange(2, 1, periodRows.length, 3).setValues(periodRows);
+    }
+  } finally {
+    lock.releaseLock();
+  }
+  return { rows: clean.length, teachersAdded: toAdd.length, deactivated: deactivated, periods: periodRows ? periodRows.length : 0, mode: mode };
 }
 
 // ───────────────────────── LINE API ─────────────────────────
