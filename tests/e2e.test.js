@@ -274,9 +274,6 @@ const lineEvent = (events) => doPost({ postData: { contents: JSON.stringify({ de
     lineEvent([{ type: 'message', replyToken: 'r4', source: { type: 'group', groupId: 'G1', userId: 'U2' }, message: { type: 'text', text: 'แจ้งตารางสอนแทน' } }]);
     const flexRep = __lineCalls.find((c) => c.path === '/v2/bot/message/reply').payload.messages;
     ok(flexRep.length === 1 && flexRep[0].type === 'flex', 'แจ้งตารางสอนแทน → การ์ด Flex (reply)');
-    const hero = flexRep[0].contents.hero;
-    const ar = hero && /^(\d+):(\d+)$/.exec(hero.aspectRatio);
-    ok(hero && hero.type === 'image' && /lh3\.googleusercontent\.com\/d\/FILE/.test(hero.url) && ar && +ar[1] === 1024 && +ar[2] > 300 && +ar[2] <= 1024, 'การ์ดแสดงภาพตารางที่หน้าเว็บอัปโหลดลง Drive (ย่อเหลือกว้าง 1024px, อ่านขนาดจาก JPEG จริงได้ ' + (hero && hero.aspectRatio) + ')');
 
     __lineCalls.length = 0;
     lineEvent([{ type: 'message', replyToken: 'r3', source: { type: 'group', groupId: 'G1', userId: 'U2' }, message: { type: 'text', text: 'สอนแทน' } }]);

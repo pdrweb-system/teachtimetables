@@ -769,25 +769,6 @@ function roundRect(ctx, x, y, w, hh, r) {
   ctx.arcTo(x, y + hh, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
 }
 
-// ภาพที่เก็บลง Drive ใช้แสดงในการ์ด Flex ของไลน์ ซึ่ง LINE จำกัดขนาด → ย่อให้กว้างไม่เกิน 1024px (ภาพที่ครูบันทึกลงเครื่องยังเป็น 1080px)
-function shrinkForLine(dataUrl) {
-  return new Promise(function (resolve) {
-    var im = new Image();
-    im.onload = function () {
-      var maxW = 1024;
-      if (im.width <= maxW) { resolve(dataUrl); return; }
-      var c = document.createElement('canvas');
-      c.width = maxW; c.height = Math.round(im.height * maxW / im.width);
-      var ctx = c.getContext('2d');
-      ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, c.width, c.height);
-      ctx.drawImage(im, 0, 0, c.width, c.height);
-      resolve(c.toDataURL('image/jpeg', 0.9));
-    };
-    im.onerror = function () { resolve(dataUrl); };
-    im.src = dataUrl;
-  });
-}
-
 function openPreview() {
   loading(true, 'กำลังสร้างภาพ…');
   drawImage().then(function (data) {
@@ -796,8 +777,7 @@ function openPreview() {
     loading(false);
     openModal('previewModal');
     // เก็บภาพลง Drive เบื้องหลัง เพื่อให้คำสั่ง "สอนแทน" ในกลุ่มไลน์ส่งภาพได้
-    shrinkForLine(data).then(function (small) { return run('saveImageToDrive', S.date, small); })
-      .then(function (r) { if (S.img === data) S.imgDrive = r; }).catch(function () {});
+    run('saveImageToDrive', S.date, data).then(function (r) { if (S.img === data) S.imgDrive = r; }).catch(function () {});
   }).catch(function (e) { loading(false); toast('สร้างภาพไม่สำเร็จ: ' + errMsg(e), true); });
 }
 
@@ -826,7 +806,7 @@ $('#driveBtn').onclick = function () {
   if (S.imgDrive) { go(S.imgDrive); return; }
   Promise.resolve().then(function () {
     loading(true, 'กำลังบันทึกลง Drive…');
-    return shrinkForLine(S.img).then(function (small) { return run('saveImageToDrive', S.date, small); }).then(function (r) { loading(false); go(r); });
+    return run('saveImageToDrive', S.date, S.img).then(function (r) { loading(false); go(r); });
   }).catch(function (e) { loading(false); if (w) w.close(); fail(e); });
 };
 

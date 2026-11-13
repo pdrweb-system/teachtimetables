@@ -46,7 +46,7 @@
         .replace('HH', pad(t.getUTCHours())).replace('mm', pad(t.getUTCMinutes())).replace('ss', pad(t.getUTCSeconds()));
     },
     getUuid() { return Math.random().toString(16).slice(2) + Math.random().toString(16).slice(2); },
-    base64Decode(s) { return Array.from(Buffer.from(s, 'base64'), b => (b > 127 ? b - 256 : b)); }, newBlob(b, t, n) { return { b, t, n }; },
+    base64Decode(s) { return s.length; }, newBlob(b, t, n) { return { b, t, n }; },
     DigestAlgorithm: { SHA_256: 'SHA_256' }, Charset: { UTF_8: 'UTF_8' },
     computeDigest(alg, str) { return Array.from(require('crypto').createHash('sha256').update(str, 'utf8').digest(), b => (b > 127 ? b - 256 : b)); },
   };

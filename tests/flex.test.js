@@ -49,13 +49,6 @@ const RULES = {
     style: ONE_OF(['normal', 'italic']), decoration: ONE_OF(['none', 'underline', 'line-through']), action: 1,
   }, POS_OFFSET),
   separator: { margin: SPACE, color: COLOR },
-  image: {
-    url: (v) => typeof v === 'string' && /^https:\/\//.test(v) && v.length <= 2000,
-    size: ONE_OF(['xxs', 'xs', 'sm', 'md', 'lg', 'xl', 'xxl', '3xl', '4xl', '5xl', 'full']),
-    aspectRatio: (v) => { const m = /^(\d+(?:\.\d+)?):(\d+(?:\.\d+)?)$/.exec(v); return !!m && +m[1] >= 1 && +m[2] >= 1 && +m[2] <= 3 * +m[1]; },
-    aspectMode: ONE_OF(['cover', 'fit']), backgroundColor: COLOR, flex: (v) => Number.isInteger(v) && v >= 0, margin: SPACE, action: 1,
-    align: ONE_OF(['start', 'end', 'center']), gravity: ONE_OF(['top', 'bottom', 'center']),
-  },
   button: Object.assign({
     action: 1, flex: (v) => Number.isInteger(v) && v >= 0, margin: SPACE, height: ONE_OF(['sm', 'md']),
     style: ONE_OF(['primary', 'secondary', 'link']), color: COLOR, gravity: ONE_OF(['top', 'bottom', 'center']),
@@ -85,7 +78,7 @@ function flexProblems(msg) {
       if (!Array.isArray(node.contents) || !node.contents.length || node.contents.length > 12) bad(p, 'carousel ต้องมี 1–12 bubble');
       (node.contents || []).forEach((b, i) => { if (b.type !== 'bubble') bad(p, 'carousel มีของที่ไม่ใช่ bubble'); walk(b, p + '[' + i + ']'); });
     } else if (node.type === 'bubble') {
-      ['header', 'hero', 'body', 'footer'].forEach((k) => { if (node[k]) { if (node[k].type !== 'box' && !(k === 'hero' && node[k].type === 'image')) bad(p + '.' + k, 'ต้องเป็น box (hero เป็นรูปได้)'); walk(node[k], p + '.' + k); } });
+      ['header', 'hero', 'body', 'footer'].forEach((k) => { if (node[k]) { if (node[k].type !== 'box') bad(p + '.' + k, 'ต้องเป็น box'); walk(node[k], p + '.' + k); } });
       Object.keys(node.styles || {}).forEach((k) => {
         if (['header', 'hero', 'body', 'footer'].indexOf(k) < 0) bad(p + '.styles', 'block ไม่รู้จัก ' + k);
         const s = node.styles[k];
@@ -101,7 +94,7 @@ function flexProblems(msg) {
       if (node.action) action(node.action, p + '.action');
     } else if (node.type === 'button') {
       action(node.action, p + '.action');
-    } else if ((node.type === 'text' || node.type === 'image') && node.action) {
+    } else if (node.type === 'text' && node.action) {
       action(node.action, p + '.action');
     }
   };
@@ -157,8 +150,25 @@ ok(subNames.every((n) => allText(flex).indexOf(disp(n)) >= 0), 'แสดงช�
 ok(allText(flex).indexOf('ยังไม่มีผู้สอนแทน') >= 0, 'คาบที่ยังไม่มีคนแทนแสดงเป็นสีแดง');
 ok(allText(flex).indexOf('ครูนภา (ไปราชการ) — อบรม {ออนไลน์}') >= 0, 'แสดงครูที่ไม่อยู่ + เหตุผล + หมายเหตุ (Flex ไม่ต้อง escape ปีกกา)');
 ok(flex.altText.indexOf('ตารางสอนแทน') >= 0 && flex.altText.indexOf(disp(subNames[0])) >= 0, 'altText (แสดงในการแจ้งเตือน) มีชื่อผู้สอนแทน');
-const periodsShown = (allText(flex.contents.body).match(/"text":"\d+","size":"lg"/g) || []).map((s) => +s.match(/\d+/)[0]);
-ok(periodsShown.join() === periodsShown.slice().sort((a, b) => a - b).join(), 'เรียงคาบจากเช้าไปเย็น');
+// ── โครงสร้างตารางแบบเดียวกับภาพ: หัวตาราง + แถวละคาบ ──
+const body0 = flex.contents.body.contents;
+ok(/^ครูที่ไม่อยู่: /.test(body0[0].text) && body0[0].text.indexOf('ครูนภา (ไปราชการ) — อบรม {ออนไลน์}') >= 0 && body0[0].text.indexOf('ครูสมชาย (ลาป่วย)') >= 0, 'บรรทัด "ครูที่ไม่อยู่: …" เหมือนในภาพ (ทุกคน + เหตุผล + หมายเหตุ)');
+const table = body0.find((c) => c.type === 'box' && c.layout === 'vertical');
+const colHead = table.contents[0].contents.map((c) => c.text);
+ok(colHead.join('|') === 'คาบ|เวลา|ห้อง|วิชา|ครูที่ไม่อยู่|ครูสอนแทน', 'หัวตาราง 6 คอลัมน์ เหมือนในภาพ: ' + colHead.join('|'));
+const dataRows = table.contents.slice(1);
+const cellsOf = (r) => r.contents.map((c) => c.text);
+ok(dataRows.length === slotsCount && dataRows.every((r) => cellsOf(r).length === 6), 'หนึ่งแถวต่อหนึ่งคาบ (' + dataRows.length + ' แถว) แถวละ 6 ช่อง');
+const pNums = dataRows.map((r) => +cellsOf(r)[0]);
+ok(pNums.join() === pNums.slice().sort((a, b) => a - b).join(), 'เรียงคาบจากเช้าไปเย็น: ' + pNums.join());
+ok(/^\d\d:\d\d–\d\d:\d\d$/.test(cellsOf(dataRows[0])[1]) && /^ป\./.test(cellsOf(dataRows[0])[2]), 'ช่องเวลา (08:30–09:30) และห้อง (ป.…) ตรงตำแหน่ง');
+const openRows = dataRows.filter((r) => cellsOf(r)[5] === 'ยังไม่มีผู้สอนแทน');
+ok(openRows.length >= 1 && openRows.every((r) => r.backgroundColor === '#fdecec' && r.contents[5].color === '#c62828'), 'คาบที่ยังไม่มีคนแทน: พื้นแดงอ่อน ตัวหนังสือแดง');
+const doneRows = dataRows.filter((r) => cellsOf(r)[5] !== 'ยังไม่มีผู้สอนแทน');
+ok(doneRows.length >= 1 && doneRows.every((r) => r.contents[5].weight === 'bold' && r.contents[5].color === '#0b7a3e' && r.backgroundColor !== '#fdecec'), 'คาบที่มีผู้สอนแทน: ชื่อครูสีเขียวตัวหนา');
+const meta = flex.contents.footer.contents.find((c) => c.type === 'box' && c.layout === 'horizontal');
+ok(meta && /^ผู้จัด: /.test(meta.contents[0].text) && /^จัดทำเมื่อ \d{1,2} \S+ 25\d\d \d\d:\d\d น\.$/.test(meta.contents[1].text), 'ท้ายการ์ด: "ผู้จัด: …" ซ้าย และ "จัดทำเมื่อ 13 พ.ย. 2569 16:14 น." ขวา เหมือนท้ายภาพ: ' + (meta && meta.contents[1].text));
+ok(flex.contents.size === 'giga' && flex.contents.header.contents[1].contents[0].text === 'ตารางสอนแทน', 'หัวการ์ด: ชื่อโรงเรียน / ตารางสอนแทน / วันที่ + ป้ายจำนวนคาบ');
 ok(!flex.contents.footer || !allText(flex.contents.footer).includes('"button"'), 'ยังไม่มีภาพ → ไม่มีปุ่มดูภาพ');
 
 
@@ -179,30 +189,6 @@ const img = post('saveImageToDrive', [DATE, 'data:image/jpeg;base64,AAAA']).resu
 msgs = say('แจ้งตารางสอนแทน')[0].payload.messages;
 const btn = JSON.parse(allText(msgs[0].contents.footer)).contents.find((c) => c.type === 'button');
 ok(btn && btn.action.uri === img.viewUrl && flexProblems(msgs[0]).length === 0, 'มีภาพ → ปุ่ม "ดูภาพตาราง" เปิดไฟล์ใน Drive');
-
-// ── 4.1) ภาพขนาดอยู่ในเกณฑ์ → ใช้ภาพจาก Drive เป็น hero ของการ์ด ──
-const jpeg = (w, h, pad) => 'data:image/jpeg;base64,' + Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xc0, 0x00, 0x11, 0x08, h >> 8, h & 255, w >> 8, w & 255, 0x03, 0x01, 0x22, 0x00, 0x02, 0x11, 0x01, 0x03, 0x11, 0x01]), Buffer.alloc(pad || 8), Buffer.from([0xff, 0xd9])]).toString('base64');
-const withImage = (dataUrl) => { post('saveDay', [DATE, rows]); const r = post('saveImageToDrive', [DATE, dataUrl]).result; return { r, msg: say('แจ้งตารางสอนแทน')[0].payload.messages[0] }; };
-let wi = withImage(jpeg(1024, 700));
-ok(wi.r.width === 1024 && wi.r.height === 700, 'อ่านกว้าง×สูงของ JPEG ที่อัปโหลดได้ (1024×700)');
-let hb = wi.msg.contents;
-ok(wi.msg.type === 'flex' && hb.type === 'bubble' && hb.hero && hb.hero.type === 'image' && /^https:\/\/lh3\.googleusercontent\.com\/d\/FILE\d+$/.test(hb.hero.url), 'มีภาพใน Drive → การ์ดแสดงภาพ (hero) จาก URL ของ Drive');
-ok(hb.hero.aspectRatio === '1024:700' && hb.hero.size === 'full' && hb.hero.aspectMode === 'fit' && hb.hero.action.uri.indexOf('drive.google.com/file/d/') >= 0, 'hero: อัตราส่วนตามภาพจริง ไม่ครอป แตะแล้วเปิดภาพเต็มใน Drive');
-ok(flexProblems(wi.msg).length === 0, 'การ์ดแบบมีภาพผ่านการตรวจโครงสร้าง' + (flexProblems(wi.msg).length ? ': ' + flexProblems(wi.msg).join(' | ') : ''));
-ok(hb.size === 'giga' && !JSON.stringify(hb).includes('"layout":"horizontal","spacing":"md"'), 'การ์ดแบบมีภาพไม่มีแถวรายคาบ (ภาพแสดงตารางแล้ว) และไม่เป็น carousel');
-const imgText = allText(hb.body);
-ok(imgText.indexOf('ครูที่ไม่อยู่') >= 0 && subNames.every((n) => imgText.indexOf(disp(n)) >= 0) && /คาบ \d/.test(imgText) && imgText.indexOf('ยังไม่มีผู้สอนแทน คาบ') >= 0, 'ใต้ภาพสรุปเป็นตัวหนังสือ: ครูที่ไม่อยู่ ผู้สอนแทน (คาบไหน) และคาบที่ยังไม่มีคนแทน (เผื่อภาพโหลดไม่ขึ้น)');
-ok(hb.footer && allText(hb.footer).indexOf('เปิดภาพเต็ม') >= 0 && wi.msg.altText.indexOf('ตารางสอนแทน') >= 0, 'มีปุ่มเปิดภาพเต็ม และ altText ครบ');
-const tall = withImage(jpeg(1024, 3500));
-ok(tall.r.height === 3500 && !tall.msg.contents.hero && (tall.msg.contents.type === 'bubble' || tall.msg.contents.type === 'carousel'), 'ภาพสูงเกิน 1024px → ไม่ใช้ภาพ ใช้การ์ดแบบรายคาบแทน');
-const wide = withImage(jpeg(1080, 600));
-ok(!wide.msg.contents.hero, 'ภาพกว้างเกิน 1024px → ไม่ใช้ภาพ ใช้การ์ดแบบรายคาบแทน');
-const big = withImage(jpeg(900, 600, 1100000));
-ok(big.r.width === 0 && !big.msg.contents.hero, 'ไฟล์ภาพเกิน 1 MB → ไม่ใช้ภาพ (บันทึกขนาดเป็น 0)');
-const png = Buffer.alloc(40); Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).copy(png); png.writeUInt32BE(800, 16); png.writeUInt32BE(500, 20);
-ok(JSON.stringify(imageSize_(Array.from(png, (b) => (b > 127 ? b - 256 : b)))) === '{"w":800,"h":500}' && imageSize_([1, 2, 3]) === null, 'imageSize_: อ่าน PNG ได้ และไฟล์แปลก ๆ คืน null');
-post('saveDay', [DATE, rows]); // ล้างภาพของวัน (บันทึกใหม่ = ภาพเดิมไม่ตรงข้อมูล)
-ok(!say('แจ้งตารางสอนแทน')[0].payload.messages[0].contents.hero, 'หลังบันทึกข้อมูลใหม่ ภาพเก่าถูกถอน → ไม่แสดงภาพที่ไม่ตรงข้อมูล');
 
 // ── 5) คาบเยอะ → carousel, เกินขนาดที่ LINE รับ → ตัดคาบท้ายพร้อมบอกจำนวน ──
 const fake = (n) => ({
