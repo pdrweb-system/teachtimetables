@@ -6,7 +6,7 @@
 ## ความต้องการตั้งต้น (จากผู้ใช้)
 1. จัดสอนแทนสำหรับใช้ในโรงเรียน ใช้งานผ่านโทรศัพท์ได้ ใช้งานง่าย
 2. บันทึกตารางสอนแทนเป็นภาพได้
-3. ส่งเข้ากลุ่มไลน์ พร้อมแท็กชื่อสมาชิกที่มีรายชื่อสอนแทน + ตารางสอน
+3. แจ้งเข้ากลุ่มไลน์ พร้อมแท็กชื่อสมาชิกที่มีรายชื่อสอนแทน + ตารางสอน (**ตอนนี้ทำผ่านคำสั่ง reply ในกลุ่มเท่านั้น — ผู้ใช้สั่งยกเลิก push 2026-11-13**)
 4. เน้นเก็บฐานข้อมูลแบบฟรี
 5. (เพิ่มภายหลัง) ไม่ให้มีแถบเตือน "แอปพลิเคชันนี้สร้างโดยผู้ใช้ Google Apps Script" → ย้ายหน้าเว็บไป GitHub Pages
 
@@ -20,7 +20,7 @@
             Apps Script Web app /exec  (apps-script/Code.gs = JSON API)
                  │  ├─ Google Sheets  (ฐานข้อมูล 7 ชีต)
                  │  ├─ Google Drive   (เก็บภาพ JPG แชร์สาธารณะ → URL ให้ LINE)
-                 │  └─ LINE Messaging API (push / reply / profile)
+                 │  └─ LINE Messaging API (reply / profile — ไม่ใช้ push)
 LINE ──webhook POST {destination,events}──► /exec เดียวกัน (doPost แยกด้วย body.events)
 ```
 
@@ -49,6 +49,7 @@ LINE ──webhook POST {destination,events}──► /exec เดียวก�
 - เวอร์ชันแรก (Apps Script HtmlService: `Code.gs` + `Index.html`) ทำครบทุกฟีเจอร์ ทดสอบด้วย mock แล้ว
 - แปลงเป็น GitHub Pages + API: `index.html` push ขึ้น repo แล้ว (commit `4cc1957`, 2026-09-27) — แทน `google.script.run` ด้วย `fetch()` และมีช่องกรอก URL API ในแท็บตั้งค่า
 - `apps-script/Code.gs` เวอร์ชัน API อยู่ในโฟลเดอร์นี้ ผ่าน `tests/api.test.js` 19 ข้อ (เวอร์ชันนี้สร้างใหม่ให้ตรงกับ index.html — **ถ้าใน Apps Script ของผู้ใช้มี Code.gs ที่แก้เองไว้ ให้เทียบกับตัวนั้นก่อนทับ**)
+- 2026-11-13: ยกเลิก push ทั้งหมด (ใช้ reply อย่างเดียว) — ต้องวาง Code.gs ใหม่ + Deploy เวอร์ชันใหม่; เทสต์ API 41, Flex 32, e2e 34
 - 2026-11-12: คำสั่งไลน์ `แจ้งตารางสอนแทน` → reply เป็น Flex message + แท็กชื่อ (Code.gs; `tests/flex.test.js` 32 ข้อ) — ต้องวาง Code.gs ใหม่แล้ว Deploy เวอร์ชันใหม่จึงจะใช้ได้
 - 2026-11-12: เอา PIN เดิมออก → แยก 2 หน้า (index.html ครู / admin.html ผู้ดูแลที่ต้องใส่รหัส ตรวจที่ Code.gs); เทสต์ API 36 ข้อ, e2e 32 ข้อ — **ต้องวาง Code.gs ใหม่แล้ว Deploy เวอร์ชันใหม่พร้อมกับ merge หน้าเว็บ และผู้ดูแลต้องตั้งรหัสที่ admin.html ทันที**
 - 2026-11-11 (branch `claude/upbeat-curie-mt0k04`): นำ `apps-script/`, `tests/`, `docs/`, `CLAUDE.md` เข้า repo; เพิ่ม `README.md` (คู่มือติดตั้งปัจจุบัน), `.nojekyll`, `tests/e2e.test.js` (ผ่าน 21 ข้อ); index.html: fetch ล้มเหลวแจ้งเป็นภาษาไทยพร้อมวิธีตรวจ (`netFail`), บันทึก URL แล้วแจ้ง "เชื่อมต่อสำเร็จ ✓", ช่อง Webhook URL ใช้ `apiUrl()` — Code.gs ไม่ได้แก้
@@ -86,14 +87,12 @@ Script Properties: `SS_ID`, `FOLDER_ID` (โฟลเดอร์ Drive "ภา�
 | `getStats` | GET | `yyyy-MM` | ภาระสอนแทนรายครู + รายวัน |
 | `saveDay` | POST | `date, rows[]` | **แทนที่ทั้งวัน**, ตรวจชื่อครู/สอนแทนตัวเอง/ซ้ำคาบ, ใช้ LockService, ลบรายการภาพของวันนั้น |
 | `saveImageToDrive` | POST | `date, dataUrl` | JPEG base64 → Drive แชร์ "ทุกคนที่มีลิงก์" → `lh3.googleusercontent.com/d/<id>` |
-| `sendToLine` | POST | `date, dataUrl\|null` | push ภาพ + textV2 mention เข้ากลุ่ม; ถ้า dataUrl เป็น null ใช้ภาพล่าสุดใน Drive |
 | `adminStatus` | POST | – | `{hasPassword}` — หน้า admin ใช้เลือกว่าจะแสดงฟอร์มตั้งรหัสหรือเข้าสู่ระบบ |
 | `setAdminPassword` | POST | `newPw, oldPw?` | ยังไม่มีรหัส = ตั้งครั้งแรก (ใครก็ได้ — ผู้ดูแลต้องตั้งทันทีหลัง Deploy); มีแล้ว = ต้องส่ง oldPw; ยาว ≥ 6 |
 | `verifyAdmin` | POST | `pw` | |
-| `getAdminData` | POST | `pw` | ข้อมูลบอท, โควตา, กลุ่ม, ครู+userId, สมาชิกไลน์, sheetUrl, webAppUrl |
+| `getAdminData` | POST | `pw` | ข้อมูลบอท, กลุ่ม, ครู+userId, สมาชิกไลน์, sheetUrl, webAppUrl |
 | `saveLineToken` | POST | `pw, token` | ตรวจ token ด้วย `/v2/bot/info` ก่อนบันทึก, เก็บ `BOT_USER_ID` |
 | `linkTeacherLine` | POST | `pw, teacherName, userId` | ผูก/ยกเลิกผูกด้วยมือ |
-| `sendLineTest` | POST | `pw` | |
 
 ถ้าเพิ่มฟังก์ชันใหม่: เพิ่มใน `GET_API`/`POST_API` (Code.gs) และถ้าเป็น GET ให้เพิ่มใน `GET_FUNCTIONS` (index.html) ด้วย
 
@@ -101,7 +100,7 @@ Script Properties: `SS_ID`, `FOLDER_ID` (โฟลเดอร์ Drive "ภา�
 
 - ข้อความแท็กชื่อใช้ **Text message v2** (`type:"textV2"` + `substitution` แบบ `mention`) — placeholder `{t0}` ต้อง escape `{`/`}` ในข้อความอื่นเป็น `{{`/`}}` (ฟังก์ชัน `esc` ใน `buildLineMessage_`) ถ้าไม่มีใครแท็กได้จะส่ง `type:"text"` ธรรมดา
 - แท็กได้เฉพาะครูที่มี `LINE userId` — ได้จากคำสั่ง `ลงทะเบียน <ชื่อ>` ในกลุ่ม หรือผูกเองในหน้าตั้งค่า
-- **โควตา**: push เข้ากลุ่มนับตามจำนวนสมาชิกในกลุ่ม (แผนฟรีจำกัดต่อเดือน); **reply ฟรี** → คำสั่ง `สอนแทน`/`สอนแทนพรุ่งนี้` ในกลุ่มเป็นทางประหยัด (บอทตอบภาพ+แท็ก)
+- **ไม่มี push (ผู้ใช้สั่งยกเลิก 2026-11-13)**: ไม่มี `sendToLine`/`sendLineTest`/ปุ่มส่งในหน้าเว็บ/แสดงโควตา — ส่งเข้าไลน์ได้ทางเดียวคือบอท reply คำสั่งในกลุ่ม (ฟรี ไม่นับโควตา) ซึ่งต้องมีคนพิมพ์คำสั่ง; หน้าภาพในหน้าเว็บบอกให้พิมพ์ `แจ้งตารางสอนแทน`; ภาพยังอัปโหลดลง Drive เบื้องหลังเพื่อให้ `สอนแทน` และปุ่ม "ดูภาพตาราง" ในการ์ดใช้ได้; ห้ามเพิ่มการเรียก `/message/push|multicast|broadcast` (เทสต์ตรวจว่าเป็น 0); คอลัมน์ "ส่งไลน์เมื่อ" ในชีตภาพไม่ถูกใช้แล้ว
 - คำสั่งกลุ่ม: `แจ้งตารางสอนแทน[พรุ่งนี้|มะรืน]`, `สอนแทน`, `สอนแทนพรุ่งนี้`, `สอนแทนมะรืน`, `ลงทะเบียน ชื่อ`, `ตั้งกลุ่มนี้`, `คำสั่ง`
 - **`แจ้งตารางสอนแทน`** (`buildFlexMessage_` + `buildMentionNotice_`): reply = Flex ตาราง (bubble เดียว ≤ `FLEX.ROWS_PER_BUBBLE` = 15 คาบ, เกินนั้นเป็น carousel) + ในกลุ่มตามด้วย textV2 แท็กผู้สอนแทน (Flex ใส่ mention ไม่ได้; ไม่มีใครผูกไลน์ = ไม่ส่งข้อความที่สอง); แชต 1:1 ส่ง Flex อย่างเดียว
   - ข้อจำกัด LINE: bubble ≤ 30 KB, carousel ≤ 12 bubble/≤ 50 KB (1 คาบ ≈ 1 KB → แสดงได้ราว 45 คาบ เกินนั้นตัดท้ายพร้อมข้อความ "…และอีก N คาบ"), text ห้ามว่าง, altText ≤ 1500
@@ -150,7 +149,7 @@ Script Properties: `SS_ID`, `FOLDER_ID` (โฟลเดอร์ Drive "ภา�
 - ฝัง `APPS_SCRIPT_URL` ใน index.html เพื่อไม่ต้องกรอกในทุกเครื่อง (ข้อเสีย: หน้าเว็บเป็นสาธารณะ = เปิดเผย URL ที่อ่านข้อมูลได้ — ดูทางเลือกลิงก์ `#api=` ด้านล่าง)
 - ลบภาพเก่าใน Drive อัตโนมัติ (ตอนนี้ภาพถูกสร้างซ้ำทุกครั้งที่เปิดตัวอย่าง/ส่ง)
 - PWA (manifest + icon) ให้ "เพิ่มไปยังหน้าจอหลัก" สวยขึ้น
-- แจ้งเตือนส่วนตัว (push 1:1) ให้ครูที่ถูกจัด หรือส่งตอนเช้าอัตโนมัติด้วย time-driven trigger
+- (ขัดกับการยกเลิก push ที่ผู้ใช้สั่ง — ทำได้ก็ต่อเมื่อผู้ใช้เปลี่ยนใจ) แจ้งเตือนส่วนตัว/ส่งตอนเช้าอัตโนมัติ ต้องใช้ push
 - รหัสแยกรายผู้ใช้ (ตอนนี้รหัสผู้ดูแลเป็นรหัสเดียว) หรือใส่รหัสให้หน้าครูด้วยถ้าต้องการกัน URL หลุด
 - ลิงก์ตั้งค่า URL อัตโนมัติ (เช่น `…/teachtimetables/#api=<url>`) ให้ผู้ดูแลแชร์ในกลุ่มไลน์ แทนการให้แต่ละเครื่องวาง URL เอง และไม่ต้องฝัง URL ในหน้าเว็บสาธารณะ
 - นำเข้าตารางสอนจาก Excel

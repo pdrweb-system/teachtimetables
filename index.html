@@ -230,12 +230,12 @@
       <div class="muted small" style="margin-top:8px">บนมือถือ: กดค้างที่ภาพ แล้วเลือก “บันทึกรูปภาพ” ได้เลย</div>
     </div>
     <div class="sheet-f">
-      <button class="btn ok block" id="sendLineBtn">📤 ส่งเข้ากลุ่มไลน์ + แท็กชื่อ</button>
+      <div style="background:#e8f6ee;border-radius:12px;padding:10px 12px;font-size:15px">📣 <b>แจ้งในกลุ่มไลน์:</b> พิมพ์ <code class="cmd">แจ้งตารางสอนแทน</code> ในกลุ่ม บอทจะตอบเป็นการ์ดตารางสอนแทน + แท็กชื่อครูผู้สอนแทนให้ทันที</div>
       <div class="row">
         <button class="btn line grow" id="saveImgBtn">📥 บันทึกภาพ</button>
         <button class="btn line grow" id="driveBtn">☁️ เปิดใน Drive</button>
       </div>
-      <div class="muted small" style="text-align:center">ประหยัดโควตา: พิมพ์ <code class="cmd">แจ้งตารางสอนแทน</code> หรือ <code class="cmd">สอนแทน</code> ในกลุ่มไลน์ บอทจะตอบ+แท็กชื่อให้ฟรี</div>
+      <div class="muted small" style="text-align:center">อยากได้เป็นภาพ: พิมพ์ <code class="cmd">สอนแทน</code> ในกลุ่ม บอทจะตอบภาพ + แท็กชื่อ (ภาพนี้ถูกเก็บไว้ให้แล้ว)</div>
     </div>
   </div>
 </div>
@@ -784,19 +784,6 @@ function openPreview() {
     run('saveImageToDrive', S.date, data).then(function (r) { if (S.img === data) S.imgDrive = r; }).catch(function () {});
   }).catch(function (e) { loading(false); toast('สร้างภาพไม่สำเร็จ: ' + errMsg(e), true); });
 }
-
-$('#sendLineBtn').onclick = function () {
-  if (!S.img) return;
-  if (!confirm('ส่งภาพและข้อความเข้ากลุ่มไลน์ พร้อมแท็กชื่อครูสอนแทน?')) return;
-  Promise.resolve().then(function () {
-    loading(true, 'กำลังส่งเข้ากลุ่มไลน์…');
-    return run('sendToLine', S.date, S.imgDrive ? null : S.img).then(function (r) {
-      loading(false);
-      toast('ส่งเข้ากลุ่มไลน์แล้ว ✓' + (r.untagged && r.untagged.length ? ' (ไม่ได้แท็ก: ' + r.untagged.join(', ') + ')' : ''));
-      closeModal('previewModal');
-    });
-  }).catch(function (e) { loading(false); fail(e); });
-};
 
 $('#saveImgBtn').onclick = function () {
   if (!S.img) return;

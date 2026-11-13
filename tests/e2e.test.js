@@ -149,10 +149,8 @@ const lineEvent = (events) => doPost({ postData: { contents: JSON.stringify({ de
     if (OUT) fs.writeFileSync(path.join(OUT, 'preview.jpg'), Buffer.from(img.src.split(',')[1], 'base64'));
     await shot('preview-modal.png');
 
-    await page.click('#sendLineBtn');
-    await toastHas('token');
-    await idle();
-    ok(true, 'ส่งไลน์ก่อนใส่ token → แจ้งข้อผิดพลาด');
+    ok(await page.$('#sendLineBtn') === null, 'ไม่มีปุ่มส่งเข้ากลุ่ม (ไม่ใช้ push)');
+    ok((await page.textContent('#previewModal .sheet-f')).indexOf('แจ้งตารางสอนแทน') >= 0, 'หน้าภาพบอกให้พิมพ์ แจ้งตารางสอนแทน ในกลุ่ม');
     await page.click('[data-close="previewModal"]');
 
     // ── หน้าครูไม่มีส่วนตั้งค่า LINE; ลิงก์ไปหน้าผู้ดูแลมีอยู่ ──
@@ -223,22 +221,22 @@ const lineEvent = (events) => doPost({ postData: { contents: JSON.stringify({ de
     await page.goto(PAGE);
     await idle();
 
-    // ── ส่งเข้ากลุ่มไลน์ ──
+    // ── แจ้งในกลุ่มด้วยคำสั่ง (reply) ──
     await page.click('nav.tabbar button[data-tab="plan"]');
     await page.click('#saveBtn'); // ไม่มีการแก้ไข → เปิดภาพเลย
     await page.waitForSelector('#previewModal.on');
     await page.waitForFunction(() => S.imgDrive);
     __lineCalls.length = 0;
-    await page.click('#sendLineBtn');
-    await toastHas('ส่งเข้ากลุ่มไลน์แล้ว');
-    const push = __lineCalls.find((c) => c.path === '/v2/bot/message/push').payload;
-    ok(push.to === 'G1' && push.messages[0].type === 'image' && push.messages[1].type === 'textV2' &&
-      push.messages[1].substitution.t0.mentionee.userId === 'U111', 'push เข้ากลุ่ม = ภาพ + textV2 แท็กชื่อ');
+    lineEvent([{ type: 'message', replyToken: 'r4', source: { type: 'group', groupId: 'G1', userId: 'U2' }, message: { type: 'text', text: 'แจ้งตารางสอนแทน' } }]);
+    const flexRep = __lineCalls.find((c) => c.path === '/v2/bot/message/reply').payload.messages;
+    ok(flexRep[0].type === 'flex' && flexRep[1].type === 'textV2' && flexRep[1].substitution.t0.mentionee.userId === 'U111', 'แจ้งตารางสอนแทน → การ์ด Flex + แท็กชื่อ (reply)');
 
     __lineCalls.length = 0;
     lineEvent([{ type: 'message', replyToken: 'r3', source: { type: 'group', groupId: 'G1', userId: 'U2' }, message: { type: 'text', text: 'สอนแทน' } }]);
     const rep = __lineCalls.find((c) => c.path === '/v2/bot/message/reply');
     ok(rep && rep.payload.messages[0].type === 'image' && rep.payload.messages[1].type === 'textV2', 'คำสั่ง สอนแทน ในกลุ่ม → ตอบภาพ + แท็กชื่อ (reply ฟรี)');
+
+    await page.click('[data-close="previewModal"]');
 
     // ── สถิติ ──
     await page.click('nav.tabbar button[data-tab="stats"]');
@@ -248,6 +246,7 @@ const lineEvent = (events) => doPost({ postData: { contents: JSON.stringify({ de
     await shot('stats.png');
 
     ok(!log.api.some((c) => c.method === 'GET' && c.fn === 'getAdminData'), 'ฟังก์ชันผู้ดูแลไม่ถูกเรียกผ่าน GET');
+    ok(!__lineCalls.some((c) => /message\/(push|multicast|broadcast)/.test(c.path)), 'ไม่มีการ push เลย');
     ok(log.preflight === 0, 'ไม่มี CORS preflight');
     ok(log.api.filter((c) => c.method === 'POST').every((c) => /^text\/plain/.test(c.contentType || '')), 'POST ทุกครั้งเป็น text/plain');
     ok(log.errors.length === 0, 'ไม่มี error ใน console' + (log.errors.length ? ': ' + log.errors.join(' | ') : ''));

@@ -64,19 +64,18 @@ const GET_API = {
   getStats: function (month) { return getStats(month); },
 };
 
-// หน้าครู (index.html) ใช้: saveDay, saveImageToDrive, sendToLine — ไม่ต้องใช้รหัส
+// หน้าครู (index.html) ใช้: saveDay, saveImageToDrive — ไม่ต้องใช้รหัส
+// ระบบนี้ไม่ใช้ push เลย: ส่งเข้าไลน์ทางเดียวคือบอท reply คำสั่งในกลุ่ม (ฟรี ไม่นับโควตา)
 // หน้าผู้ดูแล (admin.html) ใช้ที่เหลือ — ทุกตัวที่มี pw ต้องส่งรหัสผู้ดูแลเป็นอาร์กิวเมนต์แรก
 const POST_API = {
   saveDay: saveDay,
   saveImageToDrive: saveImageToDrive,
-  sendToLine: sendToLine,
   adminStatus: adminStatus,
   setAdminPassword: setAdminPassword,
   verifyAdmin: verifyAdmin,
   getAdminData: getAdminData,
   saveLineToken: saveLineToken,
   linkTeacherLine: linkTeacherLine,
-  sendLineTest: sendLineTest,
 };
 
 function doGet(e) {
@@ -448,37 +447,6 @@ function folder_() {
   return f;
 }
 
-/** ส่งภาพ + ข้อความแท็กชื่อเข้ากลุ่มไลน์ (push — ใช้โควตาข้อความ) */
-function sendToLine(date, dataUrl) {
-  date = checkDate_(date);
-  if (!PROP.getProperty('LINE_TOKEN')) throw new Error('ยังไม่ได้ใส่ Channel access token (เมนู ตั้งค่า)');
-  const groupId = settings_()[SET.GROUP];
-  if (!groupId) throw new Error('ยังไม่ได้เชื่อมกลุ่มไลน์ — เชิญบอทเข้ากลุ่มก่อน');
-
-  const dd = getDateData(date);
-  if (!dd.subs.length) throw new Error('ยังไม่มีรายการสอนแทนของวันนี้');
-
-  let img = null;
-  if (dataUrl) img = saveImage_(date, dataUrl);
-  else img = dd.image;
-
-  const msgs = [];
-  if (img) msgs.push({ type: 'image', originalContentUrl: img.url, previewImageUrl: img.url });
-  const built = buildLineMessage_(dd, true);
-  msgs.push(built.message);
-  lineApi_('/v2/bot/message/push', { to: groupId, messages: msgs });
-
-  if (img) {
-    const sh = sheet_(SH.IMAGES);
-    const n = sh.getLastRow();
-    const ids = n > 1 ? sh.getRange(2, 2, n - 1, 1).getValues() : [];
-    for (let i = ids.length - 1; i >= 0; i--) {
-      if (str_(ids[i][0]) === img.fileId) { sh.getRange(i + 2, 5).setValue(nowStr_()); break; }
-    }
-  }
-  return { ok: true, untagged: built.untagged };
-}
-
 /** สร้างข้อความประกาศ (textV2 + mention เมื่อทำได้) */
 function buildLineMessage_(dd, allowMention) {
   const tmap = {};
@@ -809,17 +777,11 @@ function getAdminData(pw) {
   const st = settings_();
   const hasToken = !!PROP.getProperty('LINE_TOKEN');
   let bot = null;
-  let quota = null;
   if (hasToken) {
     try {
       const b = lineApi_('/v2/bot/info', null, 'get');
       bot = { name: b.displayName, basicId: b.basicId };
     } catch (e) { bot = { error: e.message }; }
-    try {
-      const q = lineApi_('/v2/bot/message/quota', null, 'get');
-      const c = lineApi_('/v2/bot/message/quota/consumption', null, 'get');
-      quota = { type: q.type, limit: q.value, used: c.totalUsage };
-    } catch (e) { /* ไม่แสดงโควตา */ }
   }
   let webAppUrl = '';
   try { webAppUrl = ScriptApp.getService().getUrl(); } catch (e) { /* ignore */ }
@@ -828,7 +790,6 @@ function getAdminData(pw) {
     webAppUrl: webAppUrl,
     hasToken: hasToken,
     bot: bot,
-    quota: quota,
     groupId: st[SET.GROUP] || '',
     teachers: teachers_().map(function (t) {
       return { name: t.name, display: t.display, userId: t.userId, lineName: t.lineName, active: t.active };
@@ -869,14 +830,6 @@ function linkTeacherLine(pw, teacherName, userId) {
   return true;
 }
 
-function sendLineTest(pw) {
-  adminGuard_(pw);
-  const groupId = settings_()[SET.GROUP];
-  if (!groupId) throw new Error('ยังไม่ได้เชื่อมกลุ่มไลน์');
-  lineApi_('/v2/bot/message/push', { to: groupId, messages: [{ type: 'text', text: '✅ ทดสอบระบบจัดสอนแทน — เชื่อมต่อกลุ่มสำเร็จ\n\n' + HELP_TEXT }] });
-  return true;
-}
-
 // ───────────────────────── LINE API ─────────────────────────
 function lineApi_(path, payload, method) {
   const token = PROP.getProperty('LINE_TOKEN');
@@ -894,7 +847,7 @@ function lineApi_(path, payload, method) {
   if (code >= 300) {
     let msg = body;
     try { const j = JSON.parse(body); msg = j.message + (j.details ? ' ' + JSON.stringify(j.details) : ''); } catch (e) { /* raw */ }
-    if (code === 429) msg = 'โควตาข้อความเดือนนี้หมดแล้ว (หรือส่งถี่เกินไป) — ใช้คำสั่ง "สอนแทน" ในกลุ่มแทนได้ฟรี';
+    if (code === 429) msg = 'LINE จำกัดอัตราการเรียกใช้ชั่วคราว (ส่งถี่เกินไป) กรุณารอสักครู่แล้วลองใหม่';
     throw new Error('LINE ' + code + ': ' + msg);
   }
   return body ? JSON.parse(body) : {};

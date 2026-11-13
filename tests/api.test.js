@@ -15,6 +15,9 @@ let passed = 0;
 const ok = (cond, msg) => { assert.ok(cond, msg); passed++; };
 
 setup();
+let pushes = 0;
+const realFetch = UrlFetchApp.fetch;
+UrlFetchApp.fetch = (u, o) => { if (/message\/(push|multicast|broadcast|narrowcast)/.test(u)) pushes++; return realFetch(u, o); };
 
 // GET
 const init = get('getInitData');
@@ -42,7 +45,7 @@ ok(saved.ok && saved.result.subs.length === rows.length, 'saveDay');
 post('saveDay', [date, rows]);
 ok(rows_('บันทึกสอนแทน').filter(r => r[2]).length === rows.length, 'resave replaces the day, no duplicates');
 ok(post('saveDay', [date, [{ absent, sub: absent, period: 1 }]]).ok === false, 'self-substitution rejected');
-ok(post('sendToLine', [date, null]).error.indexOf('token') >= 0, 'sendToLine needs token');
+ok(post('sendToLine', [date, null]).ok === false && post('sendLineTest', ['x']).ok === false, 'push removed: sendToLine / sendLineTest no longer exist');
 
 // รหัสผู้ดูแล
 const PW = 'secret1';
@@ -57,7 +60,6 @@ ok(post('verifyAdmin', ['wrong']).error.indexOf('ไม่ถูกต้อง'
 ok(post('verifyAdmin', [PW]).result === true, 'verifyAdmin');
 ok(post('saveLineToken', ['wrong', 'tok']).ok === false && !__props.LINE_TOKEN, 'saveLineToken needs the admin password');
 ok(post('linkTeacherLine', ['wrong', 'ครูสมชาย ใจดี', 'U9']).ok === false, 'linkTeacherLine needs the admin password');
-ok(post('sendLineTest', ['wrong']).ok === false, 'sendLineTest needs the admin password');
 ok(get('getAdminData', [PW]).ok === false, 'admin API not reachable via GET');
 ok(post('setAdminPassword', ['newsecret2', PW]).result === true && post('verifyAdmin', ['newsecret2']).ok, 'change admin password with old one');
 ok(post('verifyAdmin', [PW]).ok === false, 'old password no longer works');
@@ -91,19 +93,21 @@ line([{ type: 'message', replyToken: 'r2', source: { type: 'group', groupId: 'G1
   message: { type: 'text', text: 'ลงทะเบียน ' + firstSub.replace(/^ครู/, '').split(' ')[0] } }]);
 ok(teachers_().find(t => t.name === firstSub).userId === 'U111', 'ลงทะเบียน links userId');
 
+post('saveImageToDrive', [date, 'data:image/jpeg;base64,AAAA']);
+globalThis.todayStr_ = () => date; // ให้ "วันนี้" ของคำสั่งในกลุ่ม = วันที่ทดสอบ
 __lineCalls.length = 0;
-const sent = post('sendToLine', [date, 'data:image/jpeg;base64,AAAA']);
-ok(sent.ok, 'sendToLine ok');
-const push = __lineCalls.find(c => c.path === '/v2/bot/message/push').payload;
-ok(push.to === 'G1' && push.messages[0].type === 'image' && push.messages[1].type === 'textV2', 'push = image + textV2');
-ok(push.messages[1].substitution.t0.mentionee.userId === 'U111', 'mention substitution');
+line([{ type: 'message', replyToken: 'r5', source: { type: 'group', groupId: 'G1', userId: 'U2' }, message: { type: 'text', text: 'สอนแทน' } }]);
+const rep = __lineCalls.find(c => c.path === '/v2/bot/message/reply').payload;
+ok(rep.messages[0].type === 'image' && rep.messages[1].type === 'textV2', 'สอนแทน replies image + textV2');
+ok(rep.messages[1].substitution.t0.mentionee.userId === 'U111', 'mention substitution');
 
 __lineCalls.length = 0;
 line([{ type: 'message', replyToken: 'r3', source: { type: 'group', groupId: 'G1', userId: 'U2' }, message: { type: 'text', text: 'คำสั่ง' } }]);
 ok(__lineCalls.some(c => c.path === '/v2/bot/message/reply'), 'คำสั่ง replies (free)');
 
 const admin = post('getAdminData', [AP]).result;
-ok(admin.hasToken && admin.groupId === 'G1' && admin.quota.used === 12 && admin.sheetUrl && admin.webAppUrl, 'getAdminData (with sheet/web app URL)');
+ok(admin.hasToken && admin.groupId === 'G1' && admin.sheetUrl && admin.webAppUrl, 'getAdminData (with sheet/web app URL)');
 ok(get('getStats', ['2026-09']).result.dates.length === 1, 'getStats');
 
+ok(pushes === 0, 'the system never pushes (reply only)');
 console.log('ผ่านทั้งหมด ' + passed + ' ข้อ');
