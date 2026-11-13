@@ -936,14 +936,23 @@ function handleLineWebhook_(body) {
 
 function ok_() { return ContentService.createTextOutput('OK'); }
 
+// บอทตัวเดียวอาจถูกใช้ร่วมกับระบบอื่น (ระบบเดิมส่งต่อ webhook มา) → event จากกลุ่มอื่นก็มาถึงที่นี่ด้วย
+// จึงทำงานเฉพาะกลุ่มที่ตั้งไว้ (LINE groupId): กลุ่ม/ห้องอื่นถูกเมินทั้งหมด ยกเว้นคำสั่ง "ตั้งกลุ่มนี้"
+// ตั้งกลุ่มได้ 2 ทาง: บอทเพิ่งถูกเชิญเข้ากลุ่ม (join) ตอนที่ยังไม่ได้ตั้ง หรือพิมพ์ "ตั้งกลุ่มนี้" ในกลุ่ม
+// (ไม่ตั้งอัตโนมัติจากข้อความแรกอีกแล้ว เพราะอาจเป็นกลุ่มของระบบอื่น)
 function handleEvent_(ev) {
   const src = ev.source || {};
+  const group = settings_()[SET.GROUP];
+  const isSetGroupCmd = src.type === 'group' && ev.type === 'message' && ev.message && ev.message.type === 'text' &&
+    /^ตั้งกลุ่มนี้$/.test(str_(ev.message.text).replace(/\s+/g, ' '));
+  if (group && !isSetGroupCmd && (src.type === 'room' || (src.type === 'group' && src.groupId !== group))) return;
+
   if (src.type === 'group' && ev.type === 'join') {
+    if (group && group !== src.groupId) return;
     setSetting_(SET.GROUP, src.groupId);
     reply_(ev.replyToken, [{ type: 'text', text: 'สวัสดีครับ 👋 ตั้งกลุ่มนี้เป็นกลุ่มรับประกาศสอนแทนแล้ว\nให้คุณครูแต่ละท่านพิมพ์ "ลงทะเบียน ชื่อ" เพื่อให้ระบบแท็กชื่อได้\n\n' + HELP_TEXT }]);
     return;
   }
-  if (src.type === 'group' && !settings_()[SET.GROUP]) setSetting_(SET.GROUP, src.groupId);
   if (src.userId) upsertMember_(src.groupId || '', src.userId, false);
   if (ev.type === 'memberJoined' && ev.joined) {
     (ev.joined.members || []).forEach(function (m) { if (m.userId) upsertMember_(src.groupId || '', m.userId, false); });

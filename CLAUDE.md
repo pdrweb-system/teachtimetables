@@ -107,7 +107,8 @@ Script Properties: `SS_ID`, `FOLDER_ID` (โฟลเดอร์ Drive "ภา�
   - ข้อจำกัด LINE: bubble ≤ 30 KB, carousel ≤ 12 bubble/≤ 50 KB (1 คาบ ≈ 1 KB → แสดงได้ราว 45 คาบ เกินนั้นตัดท้ายพร้อมข้อความ "…และอีก N คาบ"), text ห้ามว่าง, altText ≤ 1500
   - ถ้า LINE ปฏิเสธ Flex จะ reply ซ้ำด้วยข้อความแบบเดิม (`buildLineMessage_`) — reply token ยังใช้ได้เมื่อคำขอแรกล้ม
   - ไม่มีเครื่องมือ render Flex จริงใน sandbox (api.line.me ถูกบล็อก) — ตรวจด้วย `tests/flex.test.js`; ถ้าแก้หน้าตาให้ผู้ใช้ลองในกลุ่มจริง หรือวาง JSON จาก `--dump` ใน Flex Message Simulator ของ LINE
-- เชิญบอทเข้ากลุ่ม → event `join` ตั้ง `LINE groupId` อัตโนมัติ
+- เชิญบอทเข้ากลุ่ม → event `join` ตั้ง `LINE groupId` อัตโนมัติ **เฉพาะเมื่อยังไม่เคยตั้ง**; ไม่ตั้งอัตโนมัติจากข้อความแรกอีกแล้ว (ต้อง join หรือพิมพ์ `ตั้งกลุ่มนี้`)
+- **บอทใช้ร่วมกับระบบอื่นได้ (ผู้ใช้มีบอทได้ตัวเดียว, webhook อยู่กับระบบเดิม → ระบบเดิม forward event มาที่ /exec)**: `handleEvent_` เมินกลุ่ม/ห้องที่ไม่ใช่ `LINE groupId` ที่ตั้งไว้ (ไม่ตอบ ไม่เก็บสมาชิก) ยกเว้นคำสั่ง `ตั้งกลุ่มนี้`; แชต 1:1 ใช้ได้; reply token ใช้ได้ครั้งเดียว ระบบเดิมต้องไม่ตอบคำสั่งชุดเดียวกัน; ขั้นตอนอยู่ใน README
 - Apps Script อ่าน HTTP header ไม่ได้ → **ตรวจ `X-Line-Signature` ไม่ได้**; กันด้วยการเทียบ `destination` กับ `BOT_USER_ID` เท่านั้น
 - ปุ่ม Verify ใน LINE Console มักขึ้น 302 (Apps Script redirect) — ปกติ ให้ทดสอบด้วยการพิมพ์ `คำสั่ง` ในกลุ่ม
 

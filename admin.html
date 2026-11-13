@@ -353,7 +353,7 @@ function renderLine(d) {
   };
   var html = '<div class="kv">' +
     '<div class="muted">บอท</div><div>' + (d.bot ? (d.bot.error ? '<span class="pill no">ผิดพลาด</span> ' + h(d.bot.error) : '<b>' + h(d.bot.name) + '</b> <span class="muted small">' + h(d.bot.basicId || '') + '</span>') : '<span class="pill no">ยังไม่ใส่ Token</span>') + '</div>' +
-    '<div class="muted">กลุ่มไลน์</div><div>' + (d.groupId ? '<span class="pill ok">เชื่อมแล้ว</span>' : '<span class="pill no">ยังไม่เชื่อม</span> <span class="small muted">เชิญบอทเข้ากลุ่ม</span>') + '</div>' +
+    '<div class="muted">กลุ่มไลน์</div><div>' + (d.groupId ? '<span class="pill ok">เชื่อมแล้ว</span>' : '<span class="pill no">ยังไม่เชื่อม</span> <span class="small muted">เชิญบอทเข้ากลุ่ม หรือพิมพ์ ตั้งกลุ่มนี้ ในกลุ่ม</span>') + '</div>' +
     (d.quota ? '<div class="muted">โควตาเดือนนี้</div><div>ใช้ไป ' + d.quota.used + (d.quota.type === 'limited' ? ' / ' + d.quota.limit : '') + ' ข้อความ</div>' : '') +
     '<div class="muted">ผูกไลน์แล้ว</div><div>' + linked + ' / ' + d.teachers.length + ' คน</div>' +
     '</div>' +

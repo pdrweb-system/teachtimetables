@@ -72,6 +72,20 @@ ok(post('verifyAdmin', [AP]).ok, 'unlocked after the lock expires');
 ok(post('saveLineToken', [AP, 'tok']).result.name === 'บอทสอนแทน', 'saveLineToken');
 line([{ type: 'join', replyToken: 'r1', source: { type: 'group', groupId: 'G1' } }]);
 ok(settings_()['LINE groupId'] === 'G1', 'join event sets group');
+// บอทใช้ร่วมกับระบบอื่น: กลุ่มอื่นต้องไม่ถูกตั้งเป็นกลุ่มประกาศ/ไม่ได้คำตอบ/ไม่ถูกเก็บสมาชิก
+__lineCalls.length = 0;
+line([{ type: 'message', replyToken: 'rx', source: { type: 'group', groupId: 'GOTHER', userId: 'UX' }, message: { type: 'text', text: 'คำสั่ง' } }]);
+ok(!__lineCalls.some(c => c.path === '/v2/bot/message/reply') && settings_()['LINE groupId'] === 'G1', 'other group: ignored (no reply, group unchanged)');
+ok(!rows_('สมาชิกไลน์').some(r => r[0] === 'UX'), 'other group: member not stored');
+line([{ type: 'join', replyToken: 'rj', source: { type: 'group', groupId: 'GOTHER' } }]);
+ok(settings_()['LINE groupId'] === 'G1', 'join of another group does not replace the configured group');
+line([{ type: 'message', replyToken: 'rs', source: { type: 'group', groupId: 'GNEW', userId: 'UY' }, message: { type: 'text', text: 'ตั้งกลุ่มนี้' } }]);
+ok(settings_()['LINE groupId'] === 'GNEW', 'ตั้งกลุ่มนี้ works from any group');
+line([{ type: 'message', replyToken: 'rs2', source: { type: 'group', groupId: 'G1', userId: 'UY' }, message: { type: 'text', text: 'ตั้งกลุ่มนี้' } }]);
+ok(settings_()['LINE groupId'] === 'G1', 'ตั้งกลุ่มนี้ switches back');
+__lineCalls.length = 0;
+line([{ type: 'message', replyToken: 'ru', source: { type: 'user', userId: 'U2' }, message: { type: 'text', text: 'คำสั่ง' } }]);
+ok(__lineCalls.some(c => c.path === '/v2/bot/message/reply'), '1:1 chat still gets replies');
 const firstSub = rows.find(r => r.sub).sub;
 line([{ type: 'message', replyToken: 'r2', source: { type: 'group', groupId: 'G1', userId: 'U111' },
   message: { type: 'text', text: 'ลงทะเบียน ' + firstSub.replace(/^ครู/, '').split(' ')[0] } }]);
