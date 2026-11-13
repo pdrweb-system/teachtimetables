@@ -168,6 +168,16 @@
       <div id="lineBox"><div class="muted small">กำลังโหลด…</div></div>
     </div>
 
+    <div class="card" id="cfgBox">
+      <div class="card-h"><h2>ตั้งให้ทุกเครื่อง (ใส่ URL ครั้งเดียว)</h2></div>
+      <div class="muted small" id="cfgState"></div>
+      <div id="cfgHow" style="display:none">
+        <div class="muted small" style="margin-top:6px">คัดลอกบรรทัดนี้ ไปวางในไฟล์ <b>config.js</b> ของ repo แทนบรรทัด <code class="cmd">apiUrl: ''</code> แล้วกด Commit — ครูทุกคนไม่ต้องกรอก URL อีก</div>
+        <input type="text" id="cfgLine" readonly onclick="this.select()" style="margin-top:8px">
+        <a class="btn line block" href="https://github.com/pdrweb-system/teachtimetables/edit/main/config.js" target="_blank" rel="noopener" style="margin-top:8px;display:flex;align-items:center;justify-content:center;text-decoration:none">เปิดไฟล์ config.js เพื่อแก้</a>
+      </div>
+    </div>
+
     <div class="card">
       <div class="card-h"><h2>เปลี่ยนรหัสผู้ดูแล</h2></div>
       <input type="password" id="oldPw" placeholder="รหัสเดิม" autocomplete="current-password">
@@ -183,10 +193,11 @@
 <div id="toast"></div>
 <div id="loading"><div class="spin"></div><div id="loadingText">กำลังโหลด…</div></div>
 
+<script src="config.js"></script>
 <script>
 /* ═══════════════ ส่วนกลาง (ชุดเดียวกับ index.html) ═══════════════ */
-// ใช้ URL เดียวกับหน้าจัดสอนแทน (localStorage ของเว็บเดียวกันใช้ร่วมกัน)
-var APPS_SCRIPT_URL = '';
+// URL ของ Apps Script: config.js (ตั้งครั้งเดียวทุกเครื่อง) หรือที่กรอกไว้ในเครื่องนี้ (localStorage ใช้ร่วมกับหน้าจัดสอนแทน)
+function cfgUrl() { return (window.APP_CONFIG && window.APP_CONFIG.apiUrl || '').trim(); }
 var ADMIN = { pw: '', init: null, data: null };
 
 function $(s) { return document.querySelector(s); }
@@ -194,7 +205,7 @@ function h(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (
 function errMsg(e) { return (e && (e.message || e)) + ''; }
 function store(k, v) { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) {} }
 function load(k) { try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } }
-function apiUrl() { return APPS_SCRIPT_URL || load('apiUrl'); }
+function apiUrl() { return cfgUrl() || load('apiUrl'); }
 
 // รหัสผู้ดูแลจำเฉพาะแท็บนี้ (sessionStorage) — ปิดแท็บ/เบราว์เซอร์แล้วต้องใส่ใหม่
 function saveSession(v) { try { if (v == null) sessionStorage.removeItem('adminpw'); else sessionStorage.setItem('adminpw', v); } catch (e) {} }
@@ -342,6 +353,11 @@ function loadLine() {
 
 function renderLine(d) {
   ADMIN.data = d;
+  var inCfg = !!cfgUrl();
+  $('#cfgState').innerHTML = inCfg ? '<span class="pill ok">ตั้งไว้กลางแล้ว</span> ทุกเครื่องใช้ URL จาก config.js'
+    : '<span class="pill no">ยังไม่ได้ตั้งกลาง</span> ตอนนี้แต่ละเครื่องต้องกรอก URL เอง';
+  $('#cfgHow').style.display = inCfg ? 'none' : '';
+  $('#cfgLine').value = "apiUrl: '" + (apiUrl() || '') + "'";
   var html = '<div class="kv">' +
     '<div class="muted">บอท</div><div>' + (d.bot ? (d.bot.error ? '<span class="pill no">ผิดพลาด</span> ' + h(d.bot.error) : '<b>' + h(d.bot.name) + '</b> <span class="muted small">' + h(d.bot.basicId || '') + '</span>') : '<span class="pill no">ยังไม่ใส่ Token</span>') + '</div>' +
     '<div class="muted">กลุ่มรับประกาศ</div><div>' + (d.groupId ? '<span class="pill ok">เลือกแล้ว</span>' : '<span class="pill no">ยังไม่เลือก</span>') + '</div>' +

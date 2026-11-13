@@ -39,6 +39,7 @@ LINE ──webhook POST {destination,events}──► /exec เดียวก�
 | `tests/flex.test.js` | ทดสอบคำสั่ง `แจ้งตารางสอนแทน` + ตัวตรวจ Flex (property/ค่า/ขนาด) — `node tests/flex.test.js [--dump]` |
 | `tests/e2e.test.js` | ทดสอบหน้าเว็บทั้ง flow ใน Chromium กับ Code.gs จริง — `node tests/e2e.test.js [โฟลเดอร์ภาพ]` |
 | `README.md` | คู่มือผู้ใช้ (ภาษาไทย) สำหรับสถาปัตยกรรมปัจจุบัน: ติดตั้ง, Deploy, GitHub Pages, LINE, อัปเดตจากเวอร์ชันเดิม, FAQ |
+| `config.js` | ตั้งค่ากลาง `window.APP_CONFIG = { apiUrl }` — โหลดก่อนสคริปต์หลักทั้ง index.html และ admin.html (ห้ามใส่ความลับ: เป็นไฟล์สาธารณะ) |
 | `.nojekyll` | ปิด Jekyll ของ GitHub Pages (ดูข้อควรระวัง) |
 | `docs/SETUP-legacy-htmlservice.md` | คู่มือติดตั้งเวอร์ชันเดิม (HtmlService) — เก็บไว้อ้างอิง; คู่มือปัจจุบันคือ `README.md` |
 | `docs/sample-output.jpg` | ตัวอย่างภาพตารางสอนแทนที่ระบบสร้าง |
@@ -49,6 +50,7 @@ LINE ──webhook POST {destination,events}──► /exec เดียวก�
 - เวอร์ชันแรก (Apps Script HtmlService: `Code.gs` + `Index.html`) ทำครบทุกฟีเจอร์ ทดสอบด้วย mock แล้ว
 - แปลงเป็น GitHub Pages + API: `index.html` push ขึ้น repo แล้ว (commit `4cc1957`, 2026-09-27) — แทน `google.script.run` ด้วย `fetch()` และมีช่องกรอก URL API ในแท็บตั้งค่า
 - `apps-script/Code.gs` เวอร์ชัน API อยู่ในโฟลเดอร์นี้ ผ่าน `tests/api.test.js` 19 ข้อ (เวอร์ชันนี้สร้างใหม่ให้ตรงกับ index.html — **ถ้าใน Apps Script ของผู้ใช้มี Code.gs ที่แก้เองไว้ ให้เทียบกับตัวนั้นก่อนทับ**)
+- 2026-11-13: ใส่ URL API ครั้งเดียวใน `config.js` (ไม่ต้องกรอกทุกเครื่อง); e2e 41 ข้อ
 - 2026-11-13: เอาการผูกชื่อครู/แท็กชื่อออก (reply เป็น Flex อย่างเดียว); เทสต์ API 56, Flex 32, e2e 36
 - 2026-11-13: บอท reply คำเดียว `แจ้งตารางสอนแทน` (ตัดคำสั่งอื่นทั้งหมด) + เลือกกลุ่มในหน้า admin; เทสต์ API 56, Flex 36, e2e 36 — ต้องวาง Code.gs ใหม่ + Deploy เวอร์ชันใหม่
 - 2026-11-13: ยกเลิก push ทั้งหมด (ใช้ reply อย่างเดียว) — ต้องวาง Code.gs ใหม่ + Deploy เวอร์ชันใหม่; เทสต์ API 41, Flex 32, e2e 34
@@ -60,7 +62,7 @@ LINE ──webhook POST {destination,events}──► /exec เดียวก�
 1. Merge branch `claude/upbeat-curie-mt0k04` เข้า `main` (GitHub Pages เสิร์ฟจาก `main` — ก่อน merge หน้าเว็บจริงยังเป็น commit `4cc1957`)
 2. เปิด GitHub Pages: repo Settings → Pages → Deploy from branch `main` / root
 3. วาง `apps-script/Code.gs` ทับใน Apps Script → Deploy → จัดการการทำให้ใช้งานได้ → แก้ไข → **เวอร์ชันใหม่**
-4. นำ URL `/exec` ไปกรอกในหน้าเว็บ แท็บ ⚙️ ตั้งค่า → การเชื่อมต่อ API (ไม่แนะนำฝังใน `APPS_SCRIPT_URL` เพราะหน้าเว็บเป็นสาธารณะ — ดู README หัวข้อความปลอดภัย)
+4. วาง URL `/exec` ใน `config.js` (`apiUrl`) ครั้งเดียวแล้ว Commit — ทุกเครื่องใช้ร่วมกัน (หน้า admin มีกล่อง "ตั้งให้ทุกเครื่อง" สร้างบรรทัดให้); ทางเลือก: กรอกต่อเครื่องในแท็บ เพิ่มเติม
 5. ตรวจ Webhook URL ใน LINE Developers Console ให้เป็น `/exec` เดียวกัน
 6. ถ้าเคยมี UI เดิมใน Apps Script ให้ลบไฟล์ `Index` ออก (doGet ไม่ใช้แล้ว)
 
@@ -115,7 +117,7 @@ Script Properties: `SS_ID`, `FOLDER_ID` (โฟลเดอร์ Drive "ภา�
 ## หน้าเว็บ (index.html)
 
 - state กลางอยู่ใน `S` (`init`, `date`, `dd`, `plan`, `dirty`, `img`, `imgDrive`); render ใหม่ทั้งรายการด้วย `render()` + event delegation
-- localStorage: `apiUrl` (URL /exec) — ห่อ try/catch แล้ว
+- URL ของ API: `cfgUrl()` อ่านจาก `config.js` (`window.APP_CONFIG.apiUrl`, ตั้งครั้งเดียวใช้ทุกเครื่อง — ผู้ใช้สั่ง 2026-11-13; ไฟล์เป็นสาธารณะ = URL เปิดเผย) ถ้าว่างใช้ localStorage `apiUrl` (กรอกต่อเครื่อง); `apiUrl() = cfgUrl() || load('apiUrl')` ทั้ง index.html และ admin.html; ตั้งใน config.js แล้วช่องกรอกในหน้า index ถูกล็อก; e2e ทดสอบโดยให้ server ทดสอบเสิร์ฟ `/config.js` แทน (`globalThis.__configJs`)
 - แท็บ (index.html): จัดสอนแทน / สถิติ / เพิ่มเติม (URL API, โหลดข้อมูลใหม่, คำสั่งไลน์, ลิงก์ไป admin.html); modal แบบ bottom sheet (เลือกครู, ภาพ)
 - **จัดอัตโนมัติ** (`autoAssign`): เรียงคาบจากเช้าไปเย็น เลือกครูว่างที่ `score` ต่ำสุด = สอนแทนเดือนนี้ + สอนแทนวันนี้×2 + คาบสอนเอง×0.3, เสมอกันให้กลุ่มสาระเดียวกับครูที่ลาก่อน
 - ครูว่าง (`candidates`) = ใช้งานอยู่ ∧ ไม่ได้ลา ∧ ไม่มีคาบตัวเองในคาบนั้น ∧ ยังไม่ถูกจัดคาบนั้น; `slotConflict` แสดงแถบแดง
@@ -147,12 +149,10 @@ Script Properties: `SS_ID`, `FOLDER_ID` (โฟลเดอร์ Drive "ภา�
 
 ## ไอเดียต่อยอด (ยังไม่ได้ทำ)
 
-- ฝัง `APPS_SCRIPT_URL` ใน index.html เพื่อไม่ต้องกรอกในทุกเครื่อง (ข้อเสีย: หน้าเว็บเป็นสาธารณะ = เปิดเผย URL ที่อ่านข้อมูลได้ — ดูทางเลือกลิงก์ `#api=` ด้านล่าง)
 - ลบภาพเก่าใน Drive อัตโนมัติ (ตอนนี้ภาพถูกสร้างซ้ำทุกครั้งที่เปิดตัวอย่าง/ส่ง)
 - PWA (manifest + icon) ให้ "เพิ่มไปยังหน้าจอหลัก" สวยขึ้น
 - (ขัดกับการยกเลิก push ที่ผู้ใช้สั่ง — ทำได้ก็ต่อเมื่อผู้ใช้เปลี่ยนใจ) แจ้งเตือนส่วนตัว/ส่งตอนเช้าอัตโนมัติ ต้องใช้ push
 - รหัสแยกรายผู้ใช้ (ตอนนี้รหัสผู้ดูแลเป็นรหัสเดียว) หรือใส่รหัสให้หน้าครูด้วยถ้าต้องการกัน URL หลุด
-- ลิงก์ตั้งค่า URL อัตโนมัติ (เช่น `…/teachtimetables/#api=<url>`) ให้ผู้ดูแลแชร์ในกลุ่มไลน์ แทนการให้แต่ละเครื่องวาง URL เอง และไม่ต้องฝัง URL ในหน้าเว็บสาธารณะ
 - นำเข้าตารางสอนจาก Excel
 
 ## วิธีทำงานกับ repo นี้ (ผู้ใช้สั่งไว้)

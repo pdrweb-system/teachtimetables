@@ -165,7 +165,7 @@
   <section class="tab" id="tab-more">
     <div class="card">
       <div class="card-h"><h2>การเชื่อมต่อ API</h2></div>
-      <div class="muted small">URL ของ Apps Script (Web app) ที่หน้าเว็บนี้เรียกใช้เป็นฐานข้อมูล — ขอจากผู้ดูแลระบบ</div>
+      <div class="muted small" id="apiHint">URL ของ Apps Script (Web app) ที่หน้าเว็บนี้เรียกใช้เป็นฐานข้อมูล — ขอจากผู้ดูแลระบบ</div>
       <div class="row" style="margin-top:10px">
         <input type="text" id="apiUrlInput" class="grow" placeholder="https://script.google.com/macros/s/xxxx/exec" autocomplete="off">
         <button class="btn sm pri" id="apiUrlSaveBtn">บันทึก</button>
@@ -235,14 +235,13 @@
 <div id="toast"></div>
 <div id="loading"><div class="spin"></div><div id="loadingText">กำลังโหลด…</div></div>
 
+<script src="config.js"></script>
 <script>
 /* ═══════════════ ตั้งค่าการเชื่อมต่อ API ═══════════════ */
-// วาง URL ของ Apps Script Web app (ลงท้ายด้วย /exec) ที่นี่หลัง Deploy Code.gs
-// หรือจะเว้นว่างไว้แล้วไปกรอกในแท็บ "เพิ่มเติม > การเชื่อมต่อ API" ของหน้าเว็บก็ได้ (จำไว้ในเครื่องนั้น)
-var APPS_SCRIPT_URL = '';
-
+// URL ของ Apps Script (/exec): ใส่ครั้งเดียวใน config.js (ใช้ทุกเครื่อง) — ถ้าเว้นว่างไว้ ใช้ค่าที่กรอกในเครื่องนั้น (localStorage)
+function cfgUrl() { return (window.APP_CONFIG && window.APP_CONFIG.apiUrl || '').trim(); }
 function apiUrl() {
-  return APPS_SCRIPT_URL || load('apiUrl');
+  return cfgUrl() || load('apiUrl');
 }
 
 /* ═══════════════ ส่วนกลาง ═══════════════ */
@@ -339,6 +338,11 @@ $('#apiUrlSaveBtn').onclick = function () {
 // คืนค่า Promise<boolean> — true เมื่อโหลดข้อมูลจาก API ได้
 function boot() {
   $('#apiUrlInput').value = apiUrl();
+  if (cfgUrl()) { // ตั้งไว้กลางใน config.js แล้ว → ไม่ต้องกรอก/แก้ในเครื่อง
+    $('#apiUrlInput').readOnly = true;
+    $('#apiUrlSaveBtn').style.display = 'none';
+    $('#apiHint').textContent = 'URL นี้ตั้งไว้กลางในระบบแล้ว (config.js) ไม่ต้องกรอกในเครื่องนี้';
+  }
   if (!apiUrl()) {
     $('#absentList').innerHTML = '<div class="empty">ยังไม่ได้ตั้งค่า URL ของ Apps Script<br>ไปที่แท็บ “เพิ่มเติม” ด้านล่างเพื่อกรอก URL ก่อนใช้งาน</div>';
     showTab('more');

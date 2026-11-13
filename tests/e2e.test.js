@@ -41,6 +41,7 @@ const lineEvent = (events) => doPost({ postData: { contents: JSON.stringify({ de
 
   const types = { '.html': 'text/html; charset=utf-8', '.json': 'application/json', '.png': 'image/png', '.jpg': 'image/jpeg', '.svg': 'image/svg+xml' };
   const pageSrv = await listen((req, res) => {
+    if (req.url.split('?')[0] === '/config.js' && globalThis.__configJs != null) { res.writeHead(200, { 'Content-Type': 'text/javascript' }); return res.end(globalThis.__configJs); }
     const file = path.join(ROOT, decodeURIComponent(req.url.split('?')[0]).replace(/^\/+/, '') || 'index.html');
     if (!file.startsWith(ROOT) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) { res.writeHead(404); return res.end(); }
     res.writeHead(200, { 'Content-Type': types[path.extname(file)] || 'application/octet-stream' });
@@ -209,6 +210,7 @@ const lineEvent = (events) => doPost({ postData: { contents: JSON.stringify({ de
     ok(await page.$eval('#groupSel', (e) => e.value) === 'G1', 'เลือกกลุ่มรับประกาศแล้ว');
     ok(await page.$('select[data-teacher]') === null, 'ไม่มีส่วนผูกชื่อครูกับไลน์');
     ok(await page.$eval('#lineBox input[readonly]', (i) => i.value) === API, 'Webhook URL = URL /exec ที่หน้าเว็บใช้อยู่');
+    ok((await page.$eval('#cfgLine', (i) => i.value)) === "apiUrl: '" + API + "'" && await page.isVisible('#cfgHow'), 'หน้า admin สร้างบรรทัด apiUrl ให้ไปวางใน config.js');
     await page.fill('#oldPw', 'secret1');
     await page.fill('#chPw', 'secret2');
     await page.fill('#chPw2', 'secret2');
@@ -252,6 +254,24 @@ const lineEvent = (events) => doPost({ postData: { contents: JSON.stringify({ de
 
     ok(!log.api.some((c) => c.method === 'GET' && c.fn === 'getAdminData'), 'ฟังก์ชันผู้ดูแลไม่ถูกเรียกผ่าน GET');
     ok(!__lineCalls.some((c) => /message\/(push|multicast|broadcast)/.test(c.path)), 'ไม่มีการ push เลย');
+    // ── ตั้ง URL ครั้งเดียวใน config.js: เครื่องใหม่ (localStorage ว่าง) ไม่ต้องกรอก ──
+    globalThis.__configJs = "window.APP_CONFIG = { apiUrl: '" + API + "' };";
+    await page.evaluate(() => { localStorage.clear(); sessionStorage.clear(); });
+    await page.goto(PAGE);
+    await page.waitForFunction(() => document.querySelector('#schoolName').textContent.trim() === 'โรงเรียนตัวอย่าง');
+    await idle();
+    ok(await page.evaluate(() => localStorage.getItem('apiUrl') === null), 'config.js: โหลดข้อมูลได้โดยไม่ต้องกรอก URL (localStorage ว่าง)');
+    await page.click('nav.tabbar button[data-tab="more"]');
+    ok(await page.$eval('#apiUrlInput', (i) => i.readOnly && i.value) === API && await page.isHidden('#apiUrlSaveBtn'), 'config.js: ช่อง URL ถูกล็อก ไม่มีปุ่มบันทึก');
+    await page.goto(PAGE + 'admin.html');
+    await page.waitForSelector('#loginBox', { state: 'visible' });
+    ok(await page.isHidden('#urlBox'), 'config.js: หน้า admin ไม่ขอ URL');
+    await page.fill('#loginPw', 'secret2');
+    await page.click('#loginBtn');
+    await page.waitForSelector('#adminBox', { state: 'visible' });
+    ok((await page.textContent('#cfgState')).indexOf('ตั้งไว้กลางแล้ว') >= 0 && await page.isHidden('#cfgHow'), 'config.js: หน้า admin แสดงว่าตั้งกลางแล้ว');
+    globalThis.__configJs = null;
+
     ok(log.preflight === 0, 'ไม่มี CORS preflight');
     ok(log.api.filter((c) => c.method === 'POST').every((c) => /^text\/plain/.test(c.contentType || '')), 'POST ทุกครั้งเป็น text/plain');
     ok(log.errors.length === 0, 'ไม่มี error ใน console' + (log.errors.length ? ': ' + log.errors.join(' | ') : ''));
