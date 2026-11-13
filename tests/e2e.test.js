@@ -196,7 +196,6 @@ const lineEvent = (events) => doPost({ postData: { contents: JSON.stringify({ de
     await idle();
     ok(true, 'บันทึก token → แสดงชื่อบอท');
     // ครูพิมพ์ในกลุ่ม (กลุ่มของบอท 2 กลุ่ม) → admin เห็นกลุ่ม/ชื่อไลน์ แล้วเลือกกลุ่มรับประกาศ + ผูกชื่อครู
-    const subName = rows_('บันทึกสอนแทน').filter((r) => r[7])[0][7];
     lineEvent([{ type: 'message', replyToken: 'r2', source: { type: 'group', groupId: 'G1', userId: 'U111' }, message: { type: 'text', text: 'สวัสดีครับ' } }]);
     lineEvent([{ type: 'message', replyToken: 'r2b', source: { type: 'group', groupId: 'GOTHER', userId: 'UX' }, message: { type: 'text', text: 'แจ้งตารางสอนแทน' } }]);
     __lineCalls.length = 0;
@@ -208,10 +207,7 @@ const lineEvent = (events) => doPost({ postData: { contents: JSON.stringify({ de
     await toastHas('เลือกกลุ่มรับประกาศแล้ว');
     await idle();
     ok(await page.$eval('#groupSel', (e) => e.value) === 'G1', 'เลือกกลุ่มรับประกาศแล้ว');
-    await page.selectOption('select[data-teacher="' + subName + '"]', 'U111');
-    await toastHas('ผูกไลน์แล้ว');
-    await idle();
-    ok(await page.$$eval('#lineBox .pill.ok', (x) => x.length) >= 2, 'ผูกชื่อครูกับไลน์แล้ว (' + subName + ')');
+    ok(await page.$('select[data-teacher]') === null, 'ไม่มีส่วนผูกชื่อครูกับไลน์');
     ok(await page.$eval('#lineBox input[readonly]', (i) => i.value) === API, 'Webhook URL = URL /exec ที่หน้าเว็บใช้อยู่');
     await page.fill('#oldPw', 'secret1');
     await page.fill('#chPw', 'secret2');
@@ -238,7 +234,7 @@ const lineEvent = (events) => doPost({ postData: { contents: JSON.stringify({ de
     __lineCalls.length = 0;
     lineEvent([{ type: 'message', replyToken: 'r4', source: { type: 'group', groupId: 'G1', userId: 'U2' }, message: { type: 'text', text: 'แจ้งตารางสอนแทน' } }]);
     const flexRep = __lineCalls.find((c) => c.path === '/v2/bot/message/reply').payload.messages;
-    ok(flexRep[0].type === 'flex' && flexRep[1].type === 'textV2' && flexRep[1].substitution.t0.mentionee.userId === 'U111', 'แจ้งตารางสอนแทน → การ์ด Flex + แท็กชื่อ (reply)');
+    ok(flexRep.length === 1 && flexRep[0].type === 'flex', 'แจ้งตารางสอนแทน → การ์ด Flex (reply)');
 
     __lineCalls.length = 0;
     lineEvent([{ type: 'message', replyToken: 'r3', source: { type: 'group', groupId: 'G1', userId: 'U2' }, message: { type: 'text', text: 'สอนแทน' } }]);

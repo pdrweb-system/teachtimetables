@@ -59,7 +59,7 @@ ok(post('setAdminPassword', ['hacker1']).ok === false, 'cannot overwrite passwor
 ok(post('verifyAdmin', ['wrong']).error.indexOf('ไม่ถูกต้อง') >= 0, 'wrong admin password rejected');
 ok(post('verifyAdmin', [PW]).result === true, 'verifyAdmin');
 ok(post('saveLineToken', ['wrong', 'tok']).ok === false && !__props.LINE_TOKEN, 'saveLineToken needs the admin password');
-ok(post('linkTeacherLine', ['wrong', 'ครูสมชาย ใจดี', 'U9']).ok === false, 'linkTeacherLine needs the admin password');
+ok(post('linkTeacherLine', ['wrong', 'ครูสมชาย ใจดี', 'U9']).error.indexOf('ไม่รู้จัก') >= 0, 'teacher linking removed: linkTeacherLine no longer exists');
 ok(get('getAdminData', [PW]).ok === false, 'admin API not reachable via GET');
 ok(post('setAdminPassword', ['newsecret2', PW]).result === true && post('verifyAdmin', ['newsecret2']).ok, 'change admin password with old one');
 ok(post('verifyAdmin', [PW]).ok === false, 'old password no longer works');
@@ -93,12 +93,12 @@ ok(ag.groups.length === 2 && ag.groups.find(g => g.groupId === 'G1').name === '�
 ok(post('setLineGroup', ['wrong', 'G1']).ok === false, 'setLineGroup needs the admin password');
 ok(post('setLineGroup', [AP, 'GNOPE']).ok === false, 'cannot pick a group the bot never saw');
 ok(post('setLineGroup', [AP, 'G1']).result === true && settings_()['LINE groupId'] === 'G1', 'admin picks the announce group');
-ok(post('linkTeacherLine', [AP, firstSub, 'U111']).result === true && teachers_().find(t => t.name === firstSub).userId === 'U111', 'admin links teacher to a LINE member');
+ok(!('teachers' in ag) && !('members' in ag), 'getAdminData no longer lists teachers/members (no linking)');
 
 // เลือกกลุ่มแล้ว: ตอบเฉพาะกลุ่มนั้น เฉพาะข้อความ "แจ้งตารางสอนแทน" เป๊ะ ๆ
 let r = say('แจ้งตารางสอนแทน', inG('G1', 'U2'));
-ok(r.length === 1 && r[0].payload.messages[0].type === 'flex' && r[0].payload.messages[1].type === 'textV2', 'แจ้งตารางสอนแทน → Flex + textV2 (reply)');
-ok(r[0].payload.messages[1].substitution.t0.mentionee.userId === 'U111', 'mention substitution');
+ok(r.length === 1 && r[0].payload.messages.length === 1 && r[0].payload.messages[0].type === 'flex', 'แจ้งตารางสอนแทน → Flex card only (reply, no tagging)');
+ok(!JSON.stringify(r[0].payload).includes('mention'), 'no mention in the reply');
 ['คำสั่ง', 'help', 'สอนแทน', 'สอนแทนพรุ่งนี้', 'แจ้งตารางสอนแทนพรุ่งนี้', 'ลงทะเบียน สมชาย', 'ตั้งกลุ่มนี้', 'แจ้งตารางสอนแทนครับ', 'สวัสดี'].forEach(t => {
   ok(say(t, inG('G1', 'U2')).length === 0, 'other words are ignored: ' + t);
 });

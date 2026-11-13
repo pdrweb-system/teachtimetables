@@ -132,14 +132,14 @@ const subNames = [...new Set(rows.filter((r) => r.sub).map((r) => r.sub))];
 const linkedName = subNames[0];
 line([{ type: 'message', replyToken: 'r0', source: { type: 'group', groupId: 'G1', userId: 'U111' }, message: { type: 'text', text: 'สวัสดี' } }]);
 ok(post('setLineGroup', ['secret1', 'G1']).ok, 'เลือกกลุ่มรับประกาศ');
-ok(post('linkTeacherLine', ['secret1', linkedName, 'U111']).ok, 'ผูกไลน์ให้ ' + linkedName);
 const disp = (n) => teachers_().find((t) => t.name === n).display;
 
-// ── 1) ในกลุ่ม: reply = Flex + ข้อความแท็กชื่อ ──
+// ── 1) ในกลุ่ม: reply = Flex อย่างเดียว (ไม่แท็กชื่อ) ──
 let rep = say('แจ้งตารางสอนแทน');
 ok(rep.length === 1, 'ตอบด้วย reply (ไม่ใช่ push) 1 ครั้ง');
 let msgs = rep[0].payload.messages;
-ok(msgs.length === 2 && msgs[0].type === 'flex' && msgs[1].type === 'textV2', 'ในกลุ่ม: Flex + textV2 แท็กชื่อ');
+ok(msgs.length === 1 && msgs[0].type === 'flex', 'ในกลุ่ม: Flex อย่างเดียว');
+ok(!JSON.stringify(msgs).includes('mention'), 'ไม่มีการแท็กชื่อ (mention)');
 const flex = msgs[0];
 const probs = flexProblems(flex);
 ok(probs.length === 0, 'Flex ผ่านการตรวจโครงสร้าง' + (probs.length ? ':\n  ' + probs.join('\n  ') : ''));
@@ -149,16 +149,11 @@ ok(allText(flex.contents.header).indexOf(slotsCount + ' คาบ') >= 0 && allT
 ok(subNames.every((n) => allText(flex).indexOf(disp(n)) >= 0), 'แสดงชื่อผู้สอนแทนครบ');
 ok(allText(flex).indexOf('ยังไม่มีผู้สอนแทน') >= 0, 'คาบที่ยังไม่มีคนแทนแสดงเป็นสีแดง');
 ok(allText(flex).indexOf('ครูนภา (ไปราชการ) — อบรม {ออนไลน์}') >= 0, 'แสดงครูที่ไม่อยู่ + เหตุผล + หมายเหตุ (Flex ไม่ต้อง escape ปีกกา)');
-ok(flex.altText.indexOf('ตารางสอนแทน') >= 0 && flex.altText.indexOf(disp(linkedName)) >= 0, 'altText (แสดงในการแจ้งเตือน) มีชื่อผู้สอนแทน');
+ok(flex.altText.indexOf('ตารางสอนแทน') >= 0 && flex.altText.indexOf(disp(subNames[0])) >= 0, 'altText (แสดงในการแจ้งเตือน) มีชื่อผู้สอนแทน');
 const periodsShown = (allText(flex.contents.body).match(/"text":"\d+","size":"lg"/g) || []).map((s) => +s.match(/\d+/)[0]);
 ok(periodsShown.join() === periodsShown.slice().sort((a, b) => a - b).join(), 'เรียงคาบจากเช้าไปเย็น');
 ok(!flex.contents.footer || !allText(flex.contents.footer).includes('"button"'), 'ยังไม่มีภาพ → ไม่มีปุ่มดูภาพ');
 
-const notice = msgs[1];
-ok(notice.substitution.t0 && notice.substitution.t0.mentionee.userId === 'U111', 'แท็กครูที่ผูกไลน์แล้ว');
-ok(Object.keys(notice.substitution).every((k) => notice.text.indexOf('{' + k + '}') >= 0), 'placeholder ตรงกับ substitution');
-ok(subNames.slice(1).every((n) => notice.text.indexOf(disp(n)) >= 0), 'ครูที่ยังไม่ผูกไลน์แสดงเป็นชื่อธรรมดา');
-ok(notice.text.indexOf('วันนี้') >= 0, 'ข้อความแท็กบอกว่าเป็นของวันนี้');
 
 // ── 2) แชต 1:1 กับบอท → Flex อย่างเดียว ──
 rep = say('แจ้งตารางสอนแทน', { type: 'user', userId: 'U2' });
@@ -209,7 +204,7 @@ console.error = () => {};
 rep = say('แจ้งตารางสอนแทน');
 UrlFetchApp.fetch = realFetch;
 console.error = realErr;
-ok(rep.length === 2 && rep[1].payload.messages[0].type === 'textV2', 'Flex ถูกปฏิเสธ → ตอบข้อความแท็กชื่อแบบเดิมแทน');
+ok(rep.length === 2 && rep[1].payload.messages[0].type === 'text' && rep[1].payload.messages[0].text.indexOf('ตารางสอนแทน') >= 0, 'Flex ถูกปฏิเสธ → ตอบข้อความธรรมดาแทน');
 
 if (process.argv.indexOf('--dump') >= 0) {
   console.log(JSON.stringify(say('แจ้งตารางสอนแทน')[0].payload.messages, null, 2));

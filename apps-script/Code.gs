@@ -64,7 +64,6 @@ const POST_API = {
   verifyAdmin: verifyAdmin,
   getAdminData: getAdminData,
   saveLineToken: saveLineToken,
-  linkTeacherLine: linkTeacherLine,
   setLineGroup: setLineGroup,
 };
 
@@ -317,7 +316,7 @@ function getInitData() {
     school: st[SET.SCHOOL] || '',
     signer: st[SET.SIGNER] || '',
     teachers: teachers_().map(function (t) {
-      return { name: t.name, display: t.display, dept: t.dept, active: t.active, linked: !!t.userId };
+      return { name: t.name, display: t.display, dept: t.dept, active: t.active };
     }),
     periods: periods_(),
     reasons: REASONS,
@@ -503,7 +502,7 @@ function buildLineMessage_(dd, allowMention) {
 }
 
 // ───────────────────────── Flex message (คำสั่ง แจ้งตารางสอนแทน) ─────────────────────────
-// Flex แท็กชื่อไม่ได้ (mention มีเฉพาะใน textV2) → ตอบ Flex แล้วตามด้วยข้อความแท็กชื่อสั้น ๆ (buildMentionNotice_)
+// ไม่แท็กชื่อ (ไม่ผูกครูกับ LINE userId) — การ์ดแสดงชื่อครูผู้สอนแทนเป็นตัวหนังสือ
 // ข้อจำกัดของ LINE: bubble ≤ 30 KB, carousel ≤ 12 bubble และ ≤ 50 KB, altText ≤ 1500 ตัวอักษร, text ห้ามเป็นค่าว่าง
 const FLEX = {
   ROWS_PER_BUBBLE: 15,
@@ -648,30 +647,6 @@ function buildFlexMessage_(dd) {
   return { type: 'flex', altText: alt.length > 1500 ? alt.slice(0, 1499) + '…' : alt, contents: contents };
 }
 
-/** ข้อความสั้นแท็กชื่อผู้สอนแทน (ส่งตามหลัง Flex) — null ถ้าไม่มีใครผูกไลน์ไว้ */
-function buildMentionNotice_(dd, dayWord) {
-  const tmap = {};
-  teachers_().forEach(function (t) { tmap[t.name] = t; });
-  const names = [];
-  dd.subs.forEach(function (s) { if (s.sub && names.indexOf(s.sub) < 0) names.push(s.sub); });
-  if (!names.some(function (n) { return tmap[n] && tmap[n].userId; })) return null;
-  const esc = function (s) { return String(s).replace(/[{}]/g, function (c) { return c + c; }); };
-  const subst = {};
-  const parts = names.map(function (n, i) {
-    const t = tmap[n];
-    if (t && t.userId) {
-      subst['t' + i] = { type: 'mention', mentionee: { type: 'user', userId: t.userId } };
-      return '{t' + i + '}';
-    }
-    return esc((t && t.display) || n);
-  });
-  return {
-    type: 'textV2',
-    text: '📣 ' + parts.join(' ') + esc(' — มีคาบสอนแทน' + (dayWord || '') + ' ตามตารางด้านบน 🙏'),
-    substitution: subst,
-  };
-}
-
 // ───────────────────────── สถิติ ─────────────────────────
 function getStats(month) {
   month = str_(month);
@@ -775,12 +750,6 @@ function getAdminData(pw) {
     bot: bot,
     groupId: st[SET.GROUP] || '',
     groups: knownGroups_(hasToken),
-    teachers: teachers_().map(function (t) {
-      return { name: t.name, display: t.display, userId: t.userId, lineName: t.lineName, active: t.active };
-    }),
-    members: rows_(SH.MEMBERS).map(function (r) {
-      return { userId: str_(r[0]), name: str_(r[1]) || '(ไม่ทราบชื่อ)', lastSeen: str_(r[3]) };
-    }).filter(function (m) { return m.userId; }),
   };
 }
 
@@ -830,20 +799,6 @@ function saveLineToken(pw, token) {
     if (old) PROP.setProperty('LINE_TOKEN', old); else PROP.deleteProperty('LINE_TOKEN');
     throw new Error('Token ใช้ไม่ได้: ' + e.message);
   }
-}
-
-function linkTeacherLine(pw, teacherName, userId) {
-  adminGuard_(pw);
-  const t = teachers_().filter(function (x) { return x.name === teacherName; })[0];
-  if (!t) throw new Error('ไม่พบชื่อครู');
-  userId = str_(userId);
-  let lineName = '';
-  if (userId) {
-    const m = rows_(SH.MEMBERS).filter(function (r) { return str_(r[0]) === userId; })[0];
-    lineName = m ? str_(m[1]) : '';
-  }
-  sheet_(SH.TEACHERS).getRange(t.row, 4, 1, 2).setValues([[userId, lineName]]);
-  return true;
 }
 
 // ───────────────────────── LINE API ─────────────────────────
@@ -960,8 +915,6 @@ function upsertMember_(groupId, userId, force) {
 /** คำสั่งเดียว: "แจ้งตารางสอนแทน" (ของวันนี้) → reply เป็น Flex + ข้อความแท็กชื่อผู้สอนแทน; ข้อความอื่นไม่ตอบ */
 function handleText_(ev) {
   const text = str_(ev.message.text).replace(/\s+/g, ' ');
-  const src = ev.source || {};
-  const inGroup = src.type === 'group';
   if (text !== 'แจ้งตารางสอนแทน') return;
 
   const dd = getDateData(todayStr_(0));
@@ -969,14 +922,11 @@ function handleText_(ev) {
     reply_(ev.replyToken, [{ type: 'text', text: 'ยังไม่มีการจัดสอนแทนของ' + dd.thaiDate }]);
     return;
   }
-  const msgs = [buildFlexMessage_(dd)];
-  const notice = inGroup ? buildMentionNotice_(dd, 'วันนี้') : null;
-  if (notice) msgs.push(notice);
   try {
-    reply_(ev.replyToken, msgs);
+    reply_(ev.replyToken, [buildFlexMessage_(dd)]);
   } catch (err) {
     // Flex ถูก LINE ปฏิเสธ (เช่น ข้อมูลยาวผิดปกติ) → ตอบเป็นข้อความธรรมดาแทน (reply token ยังใช้ได้เมื่อคำขอแรกล้ม)
     console.error('Flex reply failed: ' + err.message);
-    reply_(ev.replyToken, [buildLineMessage_(dd, inGroup).message]);
+    reply_(ev.replyToken, [buildLineMessage_(dd, false).message]);
   }
 }

@@ -333,12 +333,6 @@ $('#lineBox').addEventListener('change', function (e) {
     }).catch(fail).then(function () { loading(false); });
     return;
   }
-  if (!el.hasAttribute('data-teacher')) return;
-  loading(true, 'กำลังบันทึก…');
-  run('linkTeacherLine', ADMIN.pw, el.getAttribute('data-teacher'), el.value).then(function () {
-    toast(el.value ? 'ผูกไลน์แล้ว ✓' : 'ยกเลิกการผูกแล้ว');
-    return run('getAdminData', ADMIN.pw).then(renderLine);
-  }).catch(fail).then(function () { loading(false); });
 });
 
 function loadLine() {
@@ -348,20 +342,9 @@ function loadLine() {
 
 function renderLine(d) {
   ADMIN.data = d;
-  var linked = d.teachers.filter(function (t) { return t.userId; }).length;
-  var memberOpts = function (cur) {
-    var has = false;
-    var o = '<option value="">— ยังไม่ผูก —</option>' + d.members.map(function (m) {
-      if (m.userId === cur) has = true;
-      return '<option value="' + h(m.userId) + '"' + (m.userId === cur ? ' selected' : '') + '>' + h(m.name) + '</option>';
-    }).join('');
-    if (cur && !has) o += '<option value="' + h(cur) + '" selected>(ผูกไว้แล้ว)</option>';
-    return o;
-  };
   var html = '<div class="kv">' +
     '<div class="muted">บอท</div><div>' + (d.bot ? (d.bot.error ? '<span class="pill no">ผิดพลาด</span> ' + h(d.bot.error) : '<b>' + h(d.bot.name) + '</b> <span class="muted small">' + h(d.bot.basicId || '') + '</span>') : '<span class="pill no">ยังไม่ใส่ Token</span>') + '</div>' +
     '<div class="muted">กลุ่มรับประกาศ</div><div>' + (d.groupId ? '<span class="pill ok">เลือกแล้ว</span>' : '<span class="pill no">ยังไม่เลือก</span>') + '</div>' +
-    '<div class="muted">ผูกไลน์แล้ว</div><div>' + linked + ' / ' + d.teachers.length + ' คน</div>' +
     '</div>' +
     '<div style="margin-top:14px"><div class="small muted">Webhook URL (นำไปวางใน LINE Developers)</div>' +
     // ใช้ URL /exec ที่หน้านี้เรียกอยู่จริง — ScriptApp.getService().getUrl() ฝั่งเซิร์ฟเวอร์อาจคืน URL อื่น (เช่น /dev)
@@ -374,12 +357,6 @@ function renderLine(d) {
     '<select id="groupSel" style="margin-top:8px"><option value="">— ยังไม่เลือก —</option>' + (d.groups || []).map(function (g) {
       return '<option value="' + h(g.groupId) + '"' + (g.groupId === d.groupId ? ' selected' : '') + '>' + h((g.name || 'กลุ่มที่ไม่ทราบชื่อ') + ' (เห็น ' + g.seen + ' คน)') + '</option>';
     }).join('') + '</select>' +
-    '<h3 style="font-size:16px;margin:18px 0 4px">ผูกชื่อครูกับไลน์</h3>' +
-    '<div class="muted small">ให้ครูแต่ละคนพิมพ์อะไรก็ได้ในกลุ่มไลน์ 1 ครั้ง (ระบบจะเห็นชื่อไลน์) แล้วกด ↻ รีเฟรช และเลือกชื่อไลน์ของครูแต่ละคนด้านล่าง — ครูที่ยังไม่ผูกจะไม่ถูกแท็กชื่อ</div>' +
-    d.teachers.filter(function (t) { return t.active; }).map(function (t) {
-      return '<div class="linkrow"><div><b>' + h(t.display) + '</b> ' + (t.userId ? '<span class="pill ok">แท็กได้</span>' : '') + '</div>' +
-        '<select data-teacher="' + h(t.name) + '">' + memberOpts(t.userId) + '</select></div>';
-    }).join('') +
     '<button class="link" id="loadLineBtn">↻ รีเฟรช</button>';
   $('#lineBox').innerHTML = html;
 }
