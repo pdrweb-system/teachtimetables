@@ -65,6 +65,7 @@ const POST_API = {
   getAdminData: getAdminData,
   saveLineToken: saveLineToken,
   setLineGroup: setLineGroup,
+  importTimetable: importTimetable,
 };
 
 function doGet(e) {
@@ -750,27 +751,22 @@ function getAdminData(pw) {
     bot: bot,
     groupId: st[SET.GROUP] || '',
     groups: knownGroups_(hasToken),
+    lastEvent: PROP.getProperty('LAST_EVENT') || '',
+    lastMismatch: PROP.getProperty('LAST_MISMATCH') || '',
   };
 }
 
-/** กลุ่มที่บอทเคยเห็นสมาชิกพิมพ์ (จากชีตสมาชิกไลน์) พร้อมชื่อกลุ่มจาก LINE — ให้ผู้ดูแลเลือกกลุ่มรับประกาศ */
+/** กลุ่มที่บอทเคยเห็น event (จาก GROUPS_SEEN) พร้อมชื่อกลุ่มจาก LINE — ให้ผู้ดูแลเลือกกลุ่มรับประกาศ */
 function knownGroups_(withNames) {
-  const count = {};
-  const order = [];
-  rows_(SH.MEMBERS).forEach(function (r) {
-    const g = str_(r[2]);
-    if (!g) return;
-    if (!(g in count)) { count[g] = 0; order.push(g); }
-    count[g]++;
-  });
+  const seen = groupsSeen_();
   const cur = settings_()[SET.GROUP];
-  if (cur && !(cur in count)) { count[cur] = 0; order.push(cur); }
-  return order.map(function (g) {
+  if (cur && !(cur in seen)) seen[cur] = '';
+  return Object.keys(seen).sort(function (a, b) { return seen[b] < seen[a] ? -1 : (seen[b] > seen[a] ? 1 : 0); }).map(function (g) {
     let name = '';
     if (withNames) {
       try { name = lineApi_('/v2/bot/group/' + g + '/summary', null, 'get').groupName || ''; } catch (e) { /* ไม่ทราบชื่อ */ }
     }
-    return { groupId: g, name: name, seen: count[g] };
+    return { groupId: g, name: name, lastSeen: seen[g] };
   });
 }
 
@@ -799,6 +795,105 @@ function saveLineToken(pw, token) {
     if (old) PROP.setProperty('LINE_TOKEN', old); else PROP.deleteProperty('LINE_TOKEN');
     throw new Error('Token ใช้ไม่ได้: ' + e.message);
   }
+}
+
+// ───────────────────────── นำเข้าตารางสอน (ผู้ดูแลเท่านั้น) ─────────────────────────
+/**
+ * นำเข้าตารางสอนที่อ่านจาก PDF (หน้า admin อ่านไฟล์ในเบราว์เซอร์ แล้วส่งแถวที่ผู้ดูแลตรวจแล้วมาที่นี่)
+ * payload: { rows:[{teacher,day,period,subject,room}], mode:'replace'|'append',
+ *            addTeachers:[{name,display,dept}] (ครูใหม่ที่จะเพิ่มลงชีต "ครู"),
+ *            periods:[{p,start,end}] | null (ถ้าส่งมา = แทนที่ชีต "คาบเรียน"),
+ *            deactivateOthers:boolean (เฉพาะ replace: ปิดใช้งานครูที่ไม่อยู่ในตารางใหม่) }
+ * replace จะสำรองตารางเดิมไว้ในชีต "สำรองตารางสอน" ก่อน (เก็บแค่ครั้งล่าสุด)
+ */
+function importTimetable(pw, payload) {
+  adminGuard_(pw);
+  payload = payload || {};
+  const rows = payload.rows || [];
+  if (!rows.length) throw new Error('ไม่มีข้อมูลตารางสอนให้นำเข้า');
+  if (rows.length > 3000) throw new Error('ข้อมูลมากเกินไป (เกิน 3,000 แถว)');
+  const mode = payload.mode === 'append' ? 'append' : 'replace';
+
+  const have = {};
+  teachers_().forEach(function (t) { have[t.name] = true; });
+  const toAdd = [];
+  (payload.addTeachers || []).forEach(function (t) {
+    const name = str_(t.name);
+    if (!name || have[name]) return;
+    if (name.length > 100) throw new Error('ชื่อครูยาวเกินไป: ' + name);
+    have[name] = true;
+    toAdd.push([name, str_(t.display) || name, str_(t.dept).slice(0, 100), '', '', true]);
+  });
+
+  const seen = {};
+  const used = {};
+  const clean = rows.map(function (r, i) {
+    const teacher = str_(r.teacher);
+    if (!have[teacher]) throw new Error('แถวที่ ' + (i + 1) + ': ไม่พบครู "' + teacher + '" ในชีต (ต้องเพิ่มครูใหม่ด้วย)');
+    const day = normDay_(r.day);
+    if (DAYS.indexOf(day) < 0) throw new Error('แถวที่ ' + (i + 1) + ': วันไม่ถูกต้อง "' + str_(r.day) + '"');
+    const period = Number(r.period);
+    if (!(period >= 1 && period <= 20 && period % 1 === 0)) throw new Error('แถวที่ ' + (i + 1) + ': คาบไม่ถูกต้อง "' + str_(r.period) + '"');
+    const k = teacher + '|' + day + '|' + period;
+    if (seen[k]) throw new Error(teacher + ' มีสองรายการในวัน' + day + ' คาบ ' + period);
+    seen[k] = true;
+    used[teacher] = true;
+    return [teacher, day, period, str_(r.subject).slice(0, 100), str_(r.room).slice(0, 50)];
+  });
+
+  let periodRows = null;
+  if (payload.periods && payload.periods.length) {
+    const ps = {};
+    periodRows = payload.periods.map(function (x) {
+      const p = Number(x.p);
+      const st = str_(x.start).replace('.', ':'), en = str_(x.end).replace('.', ':');
+      if (!(p >= 1 && p <= 20 && p % 1 === 0) || ps[p]) throw new Error('เลขคาบในรายการเวลาไม่ถูกต้อง/ซ้ำ');
+      if (!/^\d{1,2}:\d{2}$/.test(st) || !/^\d{1,2}:\d{2}$/.test(en)) throw new Error('รูปแบบเวลาไม่ถูกต้อง (คาบ ' + p + ')');
+      ps[p] = true;
+      const pad = function (v) { return v.length < 5 ? '0' + v : v; };
+      return [p, pad(st), pad(en)];
+    }).sort(function (a, b) { return a[0] - b[0]; });
+  }
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  let deactivated = 0;
+  try {
+    const tt = sheet_(SH.TIMETABLE);
+    const n = tt.getLastRow();
+    if (mode === 'replace') {
+      // สำรองของเดิมก่อนทับ
+      const ss = ss_();
+      let bk = ss.getSheetByName('สำรองตารางสอน');
+      if (!bk) bk = ss.insertSheet('สำรองตารางสอน');
+      const bn = bk.getLastRow();
+      if (bn > 0) bk.getRange(1, 1, bn, 7).clearContent();
+      bk.getRange(1, 1, 1, 7).setValues([HEADERS[SH.TIMETABLE].concat(['', 'สำรองเมื่อ'])]);
+      bk.getRange(2, 7, 1, 1).setValues([[nowStr_()]]);
+      if (n > 1) bk.getRange(2, 1, n - 1, 5).setValues(tt.getRange(2, 1, n - 1, 5).getValues());
+      if (n > 1) tt.getRange(2, 1, n - 1, 5).clearContent();
+    }
+    if (toAdd.length) {
+      const ts = sheet_(SH.TEACHERS);
+      ts.getRange(ts.getLastRow() + 1, 1, toAdd.length, 6).setValues(toAdd);
+    }
+    const start = mode === 'replace' ? 2 : Math.max(tt.getLastRow(), 1) + 1;
+    tt.getRange(start, 1, clean.length, 5).setValues(clean);
+    if (mode === 'replace' && payload.deactivateOthers) {
+      teachers_().forEach(function (t) {
+        if (!used[t.name] && t.active) { sheet_(SH.TEACHERS).getRange(t.row, 6).setValue(false); deactivated++; }
+      });
+    }
+    if (periodRows) {
+      const pr = sheet_(SH.PERIODS);
+      const pn = pr.getLastRow();
+      if (pn > 1) pr.getRange(2, 1, pn - 1, 3).clearContent();
+      pr.getRange(2, 1, periodRows.length, 3).setValues(periodRows);
+    }
+  } finally {
+    lock.releaseLock();
+  }
+  return { rows: clean.length, teachersAdded: toAdd.length, deactivated: deactivated, periods: periodRows ? periodRows.length : 0, mode: mode };
 }
 
 // ───────────────────────── LINE API ─────────────────────────
@@ -848,7 +943,12 @@ function doPost(e) {
 function handleLineWebhook_(body) {
   try {
     const botId = PROP.getProperty('BOT_USER_ID');
-    if (botId && body.destination && body.destination !== botId) return ok_();
+    if (botId && body.destination && body.destination !== botId) {
+      noteDiag_('LAST_MISMATCH', 'destination ' + body.destination + ' ไม่ตรงกับบอทที่ใส่ Token ไว้');
+      return ok_();
+    }
+    const first = (body.events || [])[0];
+    if (first) noteDiag_('LAST_EVENT', (first.type || '?') + ' / ' + ((first.source || {}).type || '?'));
     (body.events || []).forEach(function (ev) {
       try { handleEvent_(ev); } catch (err) { console.error(err); }
     });
@@ -861,55 +961,48 @@ function handleLineWebhook_(body) {
 function ok_() { return ContentService.createTextOutput('OK'); }
 
 // บอทตัวเดียวอาจถูกใช้ร่วมกับระบบอื่น (ระบบเดิมส่งต่อ webhook มา) → event จากกลุ่มอื่นก็มาถึงที่นี่ด้วย
-// - ยังไม่ได้เลือกกลุ่มรับประกาศ: เก็บรายชื่อสมาชิกจากทุกกลุ่ม (ให้ผู้ดูแลเห็นกลุ่ม/ชื่อไลน์ในหน้า admin) แต่ไม่ตอบอะไร
-// - เลือกกลุ่มแล้ว (หน้า admin → setLineGroup): ทำงานเฉพาะกลุ่มนั้น กลุ่ม/ห้องอื่นถูกเมินทั้งหมด
+// - ทุกกลุ่มที่เห็น event จะถูกจดไว้ (GROUPS_SEEN) ให้ผู้ดูแลเลือกกลุ่มรับประกาศในหน้า admin
+//   (จดจาก groupId ของ event เอง ไม่พึ่ง userId เพราะ LINE ไม่ส่ง userId ของคนที่ยังไม่ยินยอม)
+// - ยังไม่ได้เลือกกลุ่ม: ไม่ตอบอะไรในกลุ่ม
+// - เลือกกลุ่มแล้ว (setLineGroup): ตอบเฉพาะกลุ่มนั้น กลุ่ม/ห้องอื่นถูกเมิน
 // - แชต 1:1 กับบอทตอบคำสั่งได้เสมอ
-// คำสั่งเดียวที่บอทตอบ: "แจ้งตารางสอนแทน" (ดู handleText_) — ไม่ทักทาย ไม่ตอบ join/ลงทะเบียน/ตั้งกลุ่ม ฯลฯ
+// คำสั่งเดียวที่บอทตอบ: "แจ้งตารางสอนแทน" (ดู handleText_) — ไม่ทักทาย ไม่ตอบ join ฯลฯ
 function handleEvent_(ev) {
   const src = ev.source || {};
-  const group = settings_()[SET.GROUP];
   if (src.type === 'room') return;
-  if (src.type === 'group' && group && src.groupId !== group) return;
-
-  if (src.userId) upsertMember_(src.groupId || '', src.userId, false);
-  if (ev.type === 'memberJoined' && ev.joined) {
-    (ev.joined.members || []).forEach(function (m) { if (m.userId) upsertMember_(src.groupId || '', m.userId, false); });
-  }
-  if (src.type === 'group' && !group) return;
+  if (src.type === 'group' && src.groupId) noteGroup_(src.groupId);
+  const group = settings_()[SET.GROUP];
+  if (src.type === 'group' && (!group || src.groupId !== group)) return;
   if (ev.type === 'message' && ev.message && ev.message.type === 'text') handleText_(ev);
+}
+
+// กลุ่มที่เคยเห็น event: { groupId: 'yyyy-MM-dd HH:mm:ss' (ล่าสุด) } เก็บใน Script Properties (เก็บไม่เกิน 20 กลุ่ม)
+function groupsSeen_() {
+  try { return JSON.parse(PROP.getProperty('GROUPS_SEEN') || '{}') || {}; } catch (e) { return {}; }
+}
+function noteGroup_(groupId) {
+  const cache = CacheService.getScriptCache();
+  if (cache.get('gs_' + groupId)) return; // จดแล้วในช่วงนี้ ไม่ต้องเขียนซ้ำทุกข้อความ
+  const all = groupsSeen_();
+  all[groupId] = nowStr_();
+  const ids = Object.keys(all).sort(function (a, b) { return all[b] < all[a] ? -1 : 1; }).slice(0, 20);
+  const keep = {};
+  ids.forEach(function (g) { keep[g] = all[g]; });
+  PROP.setProperty('GROUPS_SEEN', JSON.stringify(keep));
+  cache.put('gs_' + groupId, '1', 3600);
+}
+
+// บันทึกเหตุการณ์ล่าสุดไว้ให้หน้า admin ใช้ตรวจว่า LINE/ระบบเดิมส่ง event มาถึงหรือไม่ (เขียนไม่เกินนาทีละครั้ง)
+function noteDiag_(key, text) {
+  const cache = CacheService.getScriptCache();
+  if (cache.get('dg_' + key)) return;
+  PROP.setProperty(key, nowStr_() + ' — ' + text);
+  cache.put('dg_' + key, '1', 60);
 }
 
 function reply_(token, messages) {
   if (!token) return;
   lineApi_('/v2/bot/message/reply', { replyToken: token, messages: messages });
-}
-
-function upsertMember_(groupId, userId, force) {
-  const cache = CacheService.getScriptCache();
-  const ck = 'm_' + userId;
-  const cached = cache.get(ck);
-  if (cached && !force) return cached === '1' ? '' : cached;
-
-  let name = '';
-  try {
-    const p = groupId
-      ? lineApi_('/v2/bot/group/' + groupId + '/member/' + userId, null, 'get')
-      : lineApi_('/v2/bot/profile/' + userId, null, 'get');
-    name = p.displayName || '';
-  } catch (e) { /* ignore */ }
-
-  const sh = sheet_(SH.MEMBERS);
-  const vals = rows_(SH.MEMBERS);
-  let i = -1;
-  for (let k = 0; k < vals.length; k++) if (str_(vals[k][0]) === userId) { i = k; break; }
-  if (i >= 0) {
-    sh.getRange(i + 2, 1, 1, 4).setValues([[userId, name || vals[i][1], groupId || vals[i][2], nowStr_()]]);
-    name = name || str_(vals[i][1]);
-  } else {
-    sh.appendRow([userId, name, groupId, nowStr_()]);
-  }
-  cache.put(ck, name || '1', 21600);
-  return name;
 }
 
 /** คำสั่งเดียว: "แจ้งตารางสอนแทน" (ของวันนี้) → reply เป็น Flex + ข้อความแท็กชื่อผู้สอนแทน; ข้อความอื่นไม่ตอบ */

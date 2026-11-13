@@ -163,6 +163,14 @@
       <button class="btn line block" id="openSheetBtn" style="margin-top:10px">เปิด Google Sheet</button>
     </div>
 
+    <div class="card" id="impBox">
+      <div class="card-h"><h2>นำเข้าตารางสอนจาก PDF</h2></div>
+      <div class="muted small">เลือกไฟล์ PDF ตารางสอนที่ <b>เลือกข้อความได้</b> (เช่น ส่งออกจาก Word/Excel — PDF ที่สแกนจากกระดาษอ่านไม่ได้) ระบบอ่านไฟล์ในเครื่องนี้ แล้วแสดงตัวอย่างให้ตรวจก่อนบันทึกลงชีต “ตารางสอน”</div>
+      <input type="file" id="impFile" accept="application/pdf,.pdf" style="margin-top:10px;padding:8px">
+      <div id="impStatus" class="muted small" style="margin-top:8px"></div>
+      <div id="impPreview" style="display:none"></div>
+    </div>
+
     <div class="card">
       <div class="card-h"><h2>เชื่อมต่อ LINE</h2></div>
       <div id="lineBox"><div class="muted small">กำลังโหลด…</div></div>
@@ -194,6 +202,7 @@
 <div id="loading"><div class="spin"></div><div id="loadingText">กำลังโหลด…</div></div>
 
 <script src="config.js"></script>
+<script src="timetable-import.js"></script>
 <script>
 /* ═══════════════ ส่วนกลาง (ชุดเดียวกับ index.html) ═══════════════ */
 // URL ของ Apps Script: config.js (ตั้งครั้งเดียวทุกเครื่อง) หรือที่กรอกไว้ในเครื่องนี้ (localStorage ใช้ร่วมกับหน้าจัดสอนแทน)
@@ -211,12 +220,17 @@ function apiUrl() { return cfgUrl() || load('apiUrl'); }
 function saveSession(v) { try { if (v == null) sessionStorage.removeItem('adminpw'); else sessionStorage.setItem('adminpw', v); } catch (e) {} }
 function loadSession() { try { return sessionStorage.getItem('adminpw') || ''; } catch (e) { return ''; } }
 
-// ทุกฟังก์ชันของหน้านี้เป็น POST (ไม่ตั้ง Content-Type เพื่อเลี่ยง CORS preflight — ดู index.html)
+// ฟังก์ชันอ่านอย่างเดียวเรียกด้วย GET (ต้องตรงกับ GET_API ใน Code.gs) ที่เหลือเป็น POST
+// (POST ไม่ตั้ง Content-Type เพื่อเลี่ยง CORS preflight — ดู index.html)
+var GET_FUNCTIONS = { getInitData: 1, getDateData: 1, getStats: 1 };
 function run(fn) {
   var args = Array.prototype.slice.call(arguments, 1);
   var base = apiUrl();
   if (!base) return Promise.reject(new Error('ยังไม่ได้ตั้งค่า URL ของ Apps Script'));
-  return fetch(base, { method: 'POST', body: JSON.stringify({ fn: fn, args: args }) }).then(function (res) {
+  var req = GET_FUNCTIONS[fn]
+    ? fetch(base + '?fn=' + encodeURIComponent(fn) + '&args=' + encodeURIComponent(JSON.stringify(args)))
+    : fetch(base, { method: 'POST', body: JSON.stringify({ fn: fn, args: args }) });
+  return req.then(function (res) {
     return res.text().then(function (t) {
       try { return JSON.parse(t); }
       catch (e) { throw new Error('เชื่อมต่อ API ไม่สำเร็จ (คำตอบไม่ใช่ JSON) — ตรวจสอบ URL และการ Deploy'); }
@@ -360,6 +374,8 @@ function renderLine(d) {
   $('#cfgLine').value = "apiUrl: '" + (apiUrl() || '') + "'";
   var html = '<div class="kv">' +
     '<div class="muted">บอท</div><div>' + (d.bot ? (d.bot.error ? '<span class="pill no">ผิดพลาด</span> ' + h(d.bot.error) : '<b>' + h(d.bot.name) + '</b> <span class="muted small">' + h(d.bot.basicId || '') + '</span>') : '<span class="pill no">ยังไม่ใส่ Token</span>') + '</div>' +
+    '<div class="muted">รับ event จาก LINE ล่าสุด</div><div>' + (d.lastEvent ? '<span class="pill ok">ได้รับแล้ว</span> <span class="small muted">' + h(d.lastEvent) + '</span>' : '<span class="pill no">ยังไม่เคยได้รับ</span> <span class="small muted">ตรวจ Webhook / การส่งต่อจากระบบเดิม</span>') + '</div>' +
+    (d.lastMismatch ? '<div class="muted">ปัญหา</div><div><span class="pill no">บอทไม่ตรง</span> <span class="small muted">' + h(d.lastMismatch) + ' — วาง Token ของบอทตัวที่ส่ง event มา</span></div>' : '') +
     '<div class="muted">กลุ่มรับประกาศ</div><div>' + (d.groupId ? '<span class="pill ok">เลือกแล้ว</span>' : '<span class="pill no">ยังไม่เลือก</span>') + '</div>' +
     '</div>' +
     '<div style="margin-top:14px"><div class="small muted">Webhook URL (นำไปวางใน LINE Developers)</div>' +
@@ -369,9 +385,10 @@ function renderLine(d) {
     '<div class="row"><input type="password" id="tokenInput" class="grow" autocomplete="off" placeholder="' + (d.hasToken ? '•••••• (บันทึกแล้ว — วางใหม่เพื่อเปลี่ยน)' : 'วาง token ที่นี่') + '">' +
     '<button class="btn sm pri" id="saveTokenBtn">บันทึก</button></div></div>' +
     '<h3 style="font-size:16px;margin:18px 0 4px">กลุ่มไลน์ที่ให้บอทตอบ</h3>' +
-    '<div class="muted small">บอทตอบคำสั่ง <code class="cmd">แจ้งตารางสอนแทน</code> เฉพาะกลุ่มที่เลือก (กลุ่มอื่นไม่ตอบ) กลุ่มจะโผล่ในรายการเมื่อมีคนพิมพ์อะไรก็ได้ในกลุ่มอย่างน้อย 1 ครั้ง</div>' +
+    '<div class="muted small">บอทตอบคำสั่ง <code class="cmd">แจ้งตารางสอนแทน</code> เฉพาะกลุ่มที่เลือก (กลุ่มอื่นไม่ตอบ) กลุ่มจะโผล่ในรายการเมื่อมีคนพิมพ์อะไรก็ได้ในกลุ่มอย่างน้อย 1 ครั้ง (แล้วกด ↻ รีเฟรช)</div>' +
+    ((d.groups || []).length ? '' : '<div class="small" style="color:var(--err);margin-top:6px">ยังไม่เห็นกลุ่มไหนเลย — ดูแถว “รับ event จาก LINE ล่าสุด” ด้านบน: ถ้ายังไม่เคยได้รับ แปลว่า event ยังส่งมาไม่ถึงระบบนี้ (ตรวจ Webhook ใน LINE Developers หรือการส่งต่อจากระบบเดิม และตั้ง Deploy เป็น “ทุกคน”)</div>') +
     '<select id="groupSel" style="margin-top:8px"><option value="">— ยังไม่เลือก —</option>' + (d.groups || []).map(function (g) {
-      return '<option value="' + h(g.groupId) + '"' + (g.groupId === d.groupId ? ' selected' : '') + '>' + h((g.name || 'กลุ่มที่ไม่ทราบชื่อ') + ' (เห็น ' + g.seen + ' คน)') + '</option>';
+      return '<option value="' + h(g.groupId) + '"' + (g.groupId === d.groupId ? ' selected' : '') + '>' + h((g.name || 'กลุ่มที่ไม่ทราบชื่อ') + (g.lastSeen ? ' · เห็นล่าสุด ' + g.lastSeen.slice(0, 16) : '')) + '</option>';
     }).join('') + '</select>' +
     '<button class="link" id="loadLineBtn">↻ รีเฟรช</button>';
   $('#lineBox').innerHTML = html;
@@ -386,6 +403,160 @@ function saveToken() {
     return run('getAdminData', ADMIN.pw).then(renderLine);
   }).catch(fail).then(function () { loading(false); });
 }
+
+/* ═══════════════ นำเข้าตารางสอนจาก PDF ═══════════════ */
+// ตัวอ่านตารางอยู่ใน timetable-import.js; pdf.js โหลดจาก cdnjs เฉพาะตอนเลือกไฟล์ (ไม่โหลดตอนเปิดหน้า)
+var PDFJS_VER = '3.11.174';
+var PDFJS_BASE = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/' + PDFJS_VER + '/';
+var IMP = { pages: null, existing: [], sheetPeriods: [], built: null, file: '', view: '', opt: { mode: 'replace', skipNoRoom: true, updatePeriods: true, deactivate: false } };
+
+function ensurePdfjs() {
+  if (window.pdfjsLib) return Promise.resolve();
+  return new Promise(function (resolve, reject) {
+    var sc = document.createElement('script');
+    sc.src = PDFJS_BASE + 'pdf.min.js';
+    sc.onload = function () {
+      if (!window.pdfjsLib) { reject(new Error('โหลดตัวอ่าน PDF ไม่สำเร็จ')); return; }
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_BASE + 'pdf.worker.min.js';
+      resolve();
+    };
+    sc.onerror = function () { reject(new Error('โหลดตัวอ่าน PDF (pdf.js) ไม่สำเร็จ — ตรวจอินเทอร์เน็ต')); };
+    document.head.appendChild(sc);
+  });
+}
+
+function impStatus(t, err) { var e = $('#impStatus'); e.textContent = t || ''; e.style.color = err ? 'var(--err)' : ''; }
+
+$('#impFile').addEventListener('change', function () {
+  var f = this.files && this.files[0];
+  if (!f) return;
+  IMP.file = f.name; IMP.pages = null; IMP.built = null;
+  $('#impPreview').style.display = 'none';
+  impStatus('กำลังเตรียมตัวอ่าน PDF…');
+  var buf;
+  ensurePdfjs().then(function () {
+    return new Promise(function (resolve, reject) {
+      var rd = new FileReader();
+      rd.onload = function () { resolve(rd.result); };
+      rd.onerror = function () { reject(new Error('อ่านไฟล์ไม่ได้')); };
+      rd.readAsArrayBuffer(f);
+    });
+  }).then(function (ab) {
+    buf = ab;
+    return window.pdfjsLib.getDocument({ data: new Uint8Array(buf) }).promise;
+  }).then(function (doc) {
+    var pages = [], n = 1;
+    function next() {
+      if (n > doc.numPages) return Promise.resolve(pages);
+      impStatus('กำลังอ่านหน้า ' + n + ' / ' + doc.numPages + '…');
+      return doc.getPage(n).then(function (pg) { return pg.getTextContent(); }).then(function (tc) {
+        pages.push(window.TimetableImport.parsePage(window.TimetableImport.fromPdfItems(tc.items)));
+        n++;
+        return next();
+      });
+    }
+    return next();
+  }).then(function (pages) {
+    IMP.pages = pages;
+    return run('getInitData');
+  }).then(function (init) {
+    IMP.existing = init.teachers.map(function (t) { return t.name; });
+    IMP.sheetPeriods = init.periods;
+    impStatus('');
+    impRebuild();
+  }).catch(function (e) {
+    impStatus('อ่านไฟล์ไม่สำเร็จ: ' + errMsg(e), true);
+  });
+});
+
+function impRebuild() {
+  IMP.built = window.TimetableImport.build(IMP.pages, { skipNoRoom: IMP.opt.skipNoRoom, existingTeachers: IMP.existing });
+  if (!IMP.view || !IMP.built.teachers.some(function (t) { return t.name === IMP.view; })) IMP.view = IMP.built.teachers.length ? IMP.built.teachers[0].name : '';
+  impRender();
+}
+
+function impGrid(b, name) {
+  var days = ['จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์'], cell = {};
+  b.rows.forEach(function (r) {
+    if (r.teacher !== name) return;
+    cell[r.day + '|' + r.period] = r;
+    if (days.indexOf(r.day) < 0) days.push(r.day);
+  });
+  var head = '<tr><th></th>' + b.periods.map(function (p) {
+    return '<th style="font-weight:600;padding:3px 4px;border:1px solid var(--line);font-size:12px">' + p.p + '<br><span class="muted">' + h(p.start) + '</span></th>';
+  }).join('') + '</tr>';
+  var body = days.map(function (d) {
+    return '<tr><th style="text-align:left;padding:3px 4px;border:1px solid var(--line);font-size:12px;white-space:nowrap">' + h(d) + '</th>' + b.periods.map(function (p) {
+      var r = cell[d + '|' + p.p];
+      return '<td style="border:1px solid var(--line);padding:3px 4px;font-size:12px;vertical-align:top;min-width:46px">' + (r ? h(r.subject) + '<br><span class="muted">' + h(r.room) + '</span>' : '') + '</td>';
+    }).join('') + '</tr>';
+  }).join('');
+  return '<div style="overflow-x:auto"><table style="border-collapse:collapse;width:100%">' + head + body + '</table></div>';
+}
+
+function impRender() {
+  var b = IMP.built, o = IMP.opt, box = $('#impPreview');
+  box.style.display = '';
+  var st = b.stats;
+  var html = '<div style="margin-top:12px"><b>' + h(IMP.file) + '</b><div class="small muted">อ่านได้ ' + (st.teacherPages + st.classPages + st.skippedPages) + ' หน้า: ตารางรายครู ' + st.teacherPages + ' · ตารางรายชั้น ' + st.classPages + ' · ข้าม (ไม่ใช่ตาราง) ' + st.skippedPages + '</div></div>';
+  if (!b.rows.length) {
+    html += '<div class="small" style="color:var(--err);margin-top:8px">ไม่พบตารางสอนที่อ่านได้ในไฟล์นี้' + (b.warnings.length ? ':<br>' + b.warnings.map(h).join('<br>') : ' — ตรวจว่าเป็น PDF ที่เลือกข้อความได้ และมีหัวตาราง “ตารางสอน <ชื่อครู>” หรือ “ตารางเรียนชั้น…”') + '</div>';
+    box.innerHTML = html; return;
+  }
+  var newCount = b.teachers.filter(function (t) { return t.how === 'new'; }).length;
+  html += '<div class="small" style="margin-top:8px">ใช้ข้อมูลจาก<b>ตาราง' + (b.source === 'teacher' ? 'รายครู' : 'รายชั้น') + '</b> → <b>' + b.rows.length + ' คาบ</b> ของ <b>' + b.teachers.length + ' ครู</b>' + (newCount ? ' (ครูใหม่ที่จะเพิ่มลงชีต ' + newCount + ' คน)' : '') + '</div>';
+  if (b.warnings.length) html += '<div class="small" style="color:var(--err);margin-top:8px;background:var(--errbg);border-radius:10px;padding:8px 10px;white-space:pre-wrap">⚠ ' + b.warnings.map(h).join('\n') + '</div>';
+
+  html += '<h3 style="font-size:16px;margin:16px 0 6px">ครู</h3><div style="max-height:220px;overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:14px">' +
+    '<tr><th style="text-align:left">ชื่อในไฟล์</th><th style="text-align:left">ในชีต</th><th style="text-align:right">คาบ</th></tr>' +
+    b.teachers.map(function (t) {
+      var how = t.how === 'new' ? '<span class="pill" style="background:#e8eef7;color:var(--pri)">เพิ่มใหม่</span>' : (t.how === 'first' ? '<span class="pill ok">ใช้ “' + h(t.name) + '”</span>' : '<span class="pill ok">มีแล้ว</span>');
+      return '<tr><td style="padding:4px 0;border-top:1px solid var(--line)">' + h(t.found) + '</td><td style="border-top:1px solid var(--line)">' + how + '</td><td style="text-align:right;border-top:1px solid var(--line)">' + t.rows + '</td></tr>';
+    }).join('') + '</table></div>';
+
+  html += '<h3 style="font-size:16px;margin:16px 0 6px">เวลาคาบ (ชีต “คาบเรียน”)</h3><div class="small">' + b.periods.map(function (p) { return 'คาบ ' + p.p + ': ' + h(p.start) + '–' + h(p.end); }).join(' · ') + '</div>' +
+    '<label style="display:flex;gap:8px;align-items:flex-start;margin-top:8px;font-size:14px"><input type="checkbox" id="optPeriods" style="width:20px;min-height:20px"' + (o.updatePeriods ? ' checked' : '') + '><span>แทนที่ชีต “คาบเรียน” ด้วยเวลาในไฟล์นี้ <span class="muted">(ปัจจุบัน ' + IMP.sheetPeriods.length + ' คาบ)</span></span></label>';
+
+  html += '<h3 style="font-size:16px;margin:16px 0 6px">ตรวจตัวอย่าง</h3><select id="impView">' + b.teachers.map(function (t) { return '<option value="' + h(t.name) + '"' + (t.name === IMP.view ? ' selected' : '') + '>' + h(t.name) + '</option>'; }).join('') + '</select><div style="margin-top:8px">' + impGrid(b, IMP.view) + '</div>';
+
+  html += '<h3 style="font-size:16px;margin:16px 0 6px">วิธีบันทึก</h3>' +
+    '<label style="display:flex;gap:8px;align-items:flex-start;font-size:14px"><input type="radio" name="impMode" value="replace" style="width:20px;min-height:20px"' + (o.mode === 'replace' ? ' checked' : '') + '><span>แทนที่ตารางสอนเดิมทั้งหมด <span class="muted">(สำรองของเดิมไว้ในชีต “สำรองตารางสอน”)</span></span></label>' +
+    '<label style="display:flex;gap:8px;align-items:flex-start;margin-top:6px;font-size:14px"><input type="radio" name="impMode" value="append" style="width:20px;min-height:20px"' + (o.mode === 'append' ? ' checked' : '') + '><span>เพิ่มต่อท้ายตารางเดิม</span></label>' +
+    '<label style="display:flex;gap:8px;align-items:flex-start;margin-top:10px;font-size:14px"><input type="checkbox" id="optSkip" style="width:20px;min-height:20px"' + (o.skipNoRoom ? ' checked' : '') + '><span>ข้ามช่องที่ไม่มีห้อง <span class="muted">(เช่น PLC — ไม่ใช่คาบสอน จะไม่ถูกจัดสอนแทน)</span></span></label>' +
+    (o.mode === 'replace' ? '<label style="display:flex;gap:8px;align-items:flex-start;margin-top:6px;font-size:14px"><input type="checkbox" id="optDeact" style="width:20px;min-height:20px"' + (o.deactivate ? ' checked' : '') + '><span>ปิดใช้งานครูในชีตที่ไม่อยู่ในไฟล์นี้ <span class="muted">(เช่น ครูตัวอย่าง จะไม่ถูกเลือกเป็นผู้สอนแทน)</span></span></label>' : '') +
+    '<button class="btn pri block" id="impGo" style="margin-top:14px">นำเข้า ' + b.rows.length + ' คาบลงชีต</button>';
+  box.innerHTML = html;
+}
+
+$('#impPreview').addEventListener('change', function (e) {
+  var el = e.target;
+  if (el.id === 'impView') { IMP.view = el.value; impRender(); }
+  else if (el.name === 'impMode') { IMP.opt.mode = el.value; impRender(); }
+  else if (el.id === 'optPeriods') { IMP.opt.updatePeriods = el.checked; }
+  else if (el.id === 'optDeact') { IMP.opt.deactivate = el.checked; }
+  else if (el.id === 'optSkip') { IMP.opt.skipNoRoom = el.checked; impRebuild(); }
+});
+$('#impPreview').addEventListener('click', function (e) {
+  if (e.target.id !== 'impGo') return;
+  var b = IMP.built, o = IMP.opt;
+  var newT = b.teachers.filter(function (t) { return t.how === 'new'; });
+  var msg = 'นำเข้า ' + b.rows.length + ' คาบ ของ ' + b.teachers.length + ' ครู' + (newT.length ? ' (เพิ่มครูใหม่ ' + newT.length + ' คน)' : '') + '\n' +
+    (o.mode === 'replace' ? 'จะแทนที่ตารางสอนเดิมทั้งหมด (สำรองไว้ในชีต “สำรองตารางสอน”)' : 'จะเพิ่มต่อท้ายตารางสอนเดิม') +
+    (o.updatePeriods ? '\nและแทนที่เวลาคาบ ' + b.periods.length + ' คาบ' : '') + (o.mode === 'replace' && o.deactivate ? '\nและปิดใช้งานครูที่ไม่อยู่ในไฟล์' : '') + '\n\nยืนยัน?';
+  if (!confirm(msg)) return;
+  loading(true, 'กำลังบันทึกลงชีต…');
+  run('importTimetable', ADMIN.pw, {
+    rows: b.rows, mode: o.mode, deactivateOthers: o.mode === 'replace' && o.deactivate,
+    addTeachers: newT.map(function (t) { return { name: t.name, display: t.display, dept: t.dept }; }),
+    periods: o.updatePeriods ? b.periods : null,
+  }).then(function (r) {
+    toast('นำเข้าแล้ว ✓ ' + r.rows + ' คาบ' + (r.teachersAdded ? ' · เพิ่มครู ' + r.teachersAdded + ' คน' : ''));
+    $('#impPreview').style.display = 'none';
+    $('#impFile').value = '';
+    impStatus('นำเข้าเรียบร้อย: ' + r.rows + ' คาบ' + (r.teachersAdded ? ', เพิ่มครูใหม่ ' + r.teachersAdded + ' คน' : '') + (r.deactivated ? ', ปิดใช้งานครู ' + r.deactivated + ' คน' : '') + ' — ให้ครูกด “โหลดข้อมูลครู/ตารางสอนใหม่” (แท็บ เพิ่มเติม) ในหน้าจัดสอนแทน');
+  }).catch(fail).then(function () { loading(false); });
+});
+
 
 boot();
 </script>
