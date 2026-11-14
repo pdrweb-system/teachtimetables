@@ -4,10 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex">
+<meta name="theme-color" content="#1f4e8c">
 <title>ผู้ดูแลระบบ — ระบบจัดสอนแทน</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
+  /* ชุดสี/ขนาดเดียวกับ index.html (หน้านี้มีเฉพาะส่วนที่ใช้) — ใช้บนมือถือได้: ที่แตะได้สูงอย่างน้อย 44px, ตัวอักษรในช่องกรอก ≥ 16px (iOS จะไม่ซูมเอง),
+     เลี่ยง CSS ที่มือถือรุ่นเก่าไม่รู้จัก (เช่น inset) และมีทางสำรองเมื่อไม่รองรับ gap ของ flex (ดู .nogap ท้ายไฟล์) */
   :root {
     --bg: #f2f5fa; --card: #ffffff; --ink: #1c2533; --muted: #6b778a; --line: #e2e8f0;
     --pri: #1f4e8c; --pri2: #2f74c0; --ok: #0b7a3e; --okbg: #e8f6ee; --warn: #b45309; --warnbg: #fff4e0;
@@ -16,125 +19,95 @@
     color-scheme: light;
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  button, a, select, input, label { touch-action: manipulation; }
+  html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
   html, body { margin: 0; background: var(--bg); color: var(--ink); }
   body { font-family: 'Sarabun', 'Noto Sans Thai', Tahoma, sans-serif; font-size: 16px; line-height: 1.45; }
   button, input, select { font: inherit; color: inherit; }
-  .wrap { max-width: 640px; margin: 0 auto; padding: 0 12px calc(150px + var(--safe-b)); }
+  .wrap { max-width: 640px; margin: 0 auto; padding: 0 12px calc(40px + var(--safe-b)); }
 
-  header.top { background: linear-gradient(90deg, var(--pri), var(--pri2)); color: #fff; padding: 14px 16px 16px; }
+  header.top { background: linear-gradient(90deg, var(--pri), var(--pri2)); color: #fff; padding: 12px 16px 14px; padding: calc(12px + env(safe-area-inset-top, 0px)) 16px 14px; }
   header.top .in { max-width: 640px; margin: 0 auto; }
   header.top h1 { margin: 0; font-size: 21px; font-weight: 700; }
   header.top .school { opacity: .85; font-size: 14px; }
 
   .card { background: var(--card); border-radius: var(--radius); padding: 14px; margin-top: 12px; box-shadow: 0 1px 2px rgba(20,40,80,.06); }
+  .card.slim { padding: 4px 14px; }
   .card-h { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
   .card-h h2 { margin: 0; font-size: 17px; }
   .muted { color: var(--muted); }
   .small { font-size: 13.5px; }
   .row { display: flex; gap: 8px; align-items: center; }
   .grow { flex: 1; min-width: 0; }
+  .vh { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
-  input[type=date], input[type=month], input[type=text], input[type=password], input[type=number], select {
-    width: 100%; min-height: 44px; padding: 8px 10px; border: 1px solid #cfd8e3; border-radius: 10px; background: #fff;
+  input[type=text], input[type=password], select {
+    width: 100%; min-height: 46px; padding: 8px 10px; border: 1px solid #cfd8e3; border-radius: 10px; background: #fff;
   }
+  input[readonly] { background: #f6f8fb; }
   select { appearance: none; -webkit-appearance: none; padding-right: 30px;
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236b778a' stroke-width='2' fill='none'/%3E%3C/svg%3E");
     background-repeat: no-repeat; background-position: right 10px center; }
   input:focus, select:focus { outline: 2px solid #9cc1f0; border-color: var(--pri2); }
+  input[type=checkbox], input[type=radio] { width: 22px; height: 22px; flex: none; margin: 0; accent-color: var(--pri); }
 
-  .btn { min-height: 46px; border: 0; border-radius: 12px; padding: 0 16px; font-weight: 600; cursor: pointer; }
+  .btn { min-height: 48px; border: 0; border-radius: 12px; padding: 0 16px; font-weight: 600; cursor: pointer; }
+  a.btn, label.btn { display: flex; align-items: center; justify-content: center; text-decoration: none; color: var(--ink); text-align: center; }
   .btn.pri { background: var(--pri); color: #fff; }
-  .btn.ok { background: #06c755; color: #fff; }
-  .btn.ghost { background: #e8eef7; color: var(--pri); }
   .btn.line { background: #fff; border: 1px solid #cfd8e3; }
-  .btn.sm { min-height: 36px; padding: 0 12px; font-size: 14.5px; border-radius: 10px; }
+  .btn.sm { flex: none; min-height: 44px; padding: 0 14px; font-size: 15px; border-radius: 10px; }
   .btn:disabled { opacity: .5; }
   .btn.block { width: 100%; }
-  .icon-btn { width: 36px; height: 36px; border-radius: 10px; border: 0; background: #f1f4f9; color: var(--muted); font-size: 18px; cursor: pointer; }
-  .link { background: none; border: 0; color: var(--pri2); font-weight: 600; padding: 8px 0; cursor: pointer; }
+  .link { display: inline-flex; align-items: center; background: none; border: 0; color: var(--pri2); font-weight: 600; min-height: 44px; padding: 8px 4px; cursor: pointer; text-decoration: none; }
+  /* แตะแล้วเห็นว่ากดติด (เพราะปิดแถบไฮไลต์ของเบราว์เซอร์ไว้) */
+  .btn:active, .link:active { opacity: .65; }
+  /* ปุ่มเลือกไฟล์: ช่องเลือกไฟล์ของเครื่องถูกซ่อน (.vh) แล้วใช้ label เป็นปุ่มแทน — โฟกัสด้วยแป้นพิมพ์ยังเห็นกรอบ */
+  input[type=file]:focus + label.btn { outline: 2px solid #9cc1f0; }
 
-  .daynav button { width: 46px; flex: none; }
-  .dayname { margin-top: 8px; font-weight: 600; }
+  /* ตัวเลือก (ช่องติ๊ก/ปุ่มเลือก): ทั้งแถวแตะได้ */
+  .opt { display: flex; gap: 10px; align-items: center; min-height: 44px; padding: 4px 0; font-size: 15px; cursor: pointer; }
 
-  .empty { text-align: center; color: var(--muted); padding: 22px 8px; }
-  .acard { border: 1px solid var(--line); border-radius: 12px; padding: 12px; margin-top: 10px; }
-  .acard-h { display: flex; justify-content: space-between; gap: 8px; align-items: flex-start; }
-  .aname { font-weight: 700; font-size: 17px; }
-  .grid2 { display: grid; grid-template-columns: 1fr 1.3fr; gap: 8px; margin-top: 10px; }
-  .slot { border-radius: 10px; padding: 10px; margin-top: 10px; background: var(--warnbg); border-left: 4px solid #f59e0b; }
-  .slot.ok { background: var(--okbg); border-left-color: var(--ok); }
-  .slot.bad { background: var(--errbg); border-left-color: var(--err); }
-  .slot-h { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
-  .pbadge { background: var(--pri); color: #fff; border-radius: 8px; padding: 1px 9px; font-weight: 600; font-size: 14px; }
-  .ptime { color: var(--muted); font-size: 14px; }
-  .slot-info { font-size: 15px; margin-bottom: 6px; }
-  .custom-grid { display: grid; grid-template-columns: 90px 1fr 1fr; gap: 6px; margin-bottom: 6px; }
-  .custom-grid input, .custom-grid select { min-height: 40px; }
-  .tag { display: inline-block; font-size: 12.5px; padding: 0 7px; border-radius: 6px; background: #eef2f7; color: var(--muted); }
-
-  .actionbar { position: fixed; left: 0; right: 0; bottom: calc(62px + var(--safe-b)); z-index: 20; }
-  .actionbar .in { max-width: 640px; margin: 0 auto; padding: 8px 12px; background: rgba(242,245,250,.95); backdrop-filter: blur(6px); }
-  .progress { font-size: 13.5px; color: var(--muted); margin-bottom: 6px; text-align: center; }
-  .progress b { color: var(--ink); }
-  .actionbar .row .btn { flex: 1; white-space: nowrap; padding: 0 10px; }
-  .actionbar .row #autoBtn { flex: 0 0 auto; }
-
-  nav.tabbar { position: fixed; left: 0; right: 0; bottom: 0; background: #fff; border-top: 1px solid var(--line); z-index: 21; padding-bottom: var(--safe-b); }
-  nav.tabbar .in { max-width: 640px; margin: 0 auto; display: flex; }
-  nav.tabbar button { flex: 1; height: 62px; border: 0; background: none; color: var(--muted); font-size: 13px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; cursor: pointer; }
-  nav.tabbar button .ic { font-size: 21px; line-height: 1; }
-  nav.tabbar button.on { color: var(--pri); font-weight: 700; }
-  .tab { display: none; }
-  .tab.on { display: block; }
-
-  .modal { position: fixed; inset: 0; background: rgba(15,25,40,.55); z-index: 50; display: none; align-items: flex-end; justify-content: center; }
-  .modal.on { display: flex; }
-  .sheet { background: #fff; width: 100%; max-width: 640px; max-height: 92vh; border-radius: 18px 18px 0 0; display: flex; flex-direction: column; padding-bottom: var(--safe-b); }
-  .sheet-h { padding: 14px 16px 8px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-  .sheet-h h3 { margin: 0; font-size: 18px; }
-  .sheet-b { padding: 0 16px 12px; overflow-y: auto; }
-  .sheet-f { padding: 10px 16px 14px; border-top: 1px solid var(--line); display: grid; gap: 8px; }
-  .plist button { width: 100%; text-align: left; border: 0; border-bottom: 1px solid var(--line); background: none; padding: 12px 4px; cursor: pointer; display: flex; justify-content: space-between; gap: 8px; }
-  .plist button:disabled { opacity: .4; }
-  #previewImg { width: 100%; border-radius: 10px; border: 1px solid var(--line); display: block; -webkit-touch-callout: default; }
-
-  .stat { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); }
-  .stat:last-child { border: 0; }
-  .bar { height: 8px; background: #e8eef7; border-radius: 6px; overflow: hidden; margin-top: 4px; }
-  .bar i { display: block; height: 100%; background: var(--pri2); border-radius: 6px; }
-  .num { font-weight: 700; font-size: 18px; min-width: 36px; text-align: right; }
-  .dateitem { width: 100%; text-align: left; border: 0; background: #f6f8fb; border-radius: 10px; padding: 10px 12px; margin-top: 8px; cursor: pointer; }
-
-  .kv { display: grid; grid-template-columns: 110px 1fr; gap: 6px 10px; font-size: 15px; }
-  .pill { display: inline-block; border-radius: 999px; padding: 1px 10px; font-size: 13px; font-weight: 600; }
+  .kv { display: grid; grid-template-columns: 110px 1fr; grid-gap: 6px 10px; gap: 6px 10px; font-size: 15px; }
+  .pill { display: inline-block; border-radius: 999px; padding: 1px 10px; font-size: 13px; font-weight: 600; white-space: nowrap; }
   .pill.ok { background: var(--okbg); color: var(--ok); }
   .pill.no { background: var(--errbg); color: var(--err); }
-  .linkrow { padding: 8px 0; border-bottom: 1px solid var(--line); }
-  .linkrow:last-child { border: 0; }
-  code.cmd { background: #eef2f7; border-radius: 6px; padding: 1px 6px; font-family: inherit; font-weight: 600; }
+  code.cmd { background: #eef2f7; border-radius: 6px; padding: 1px 6px; font-family: inherit; font-weight: 600; white-space: nowrap; }
 
-  #toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(150px + var(--safe-b)); background: #1c2533; color: #fff; padding: 10px 16px; border-radius: 12px; z-index: 80; max-width: 92vw; text-align: center; opacity: 0; pointer-events: none; transition: opacity .2s; font-size: 15px; }
+  /* ข้อความแจ้งผล: อยู่ด้านบนจอ (ด้านล่างมักถูกแป้นพิมพ์ของมือถือบัง) */
+  #toast { position: fixed; left: 50%; transform: translateX(-50%); top: 10px; top: calc(10px + env(safe-area-inset-top, 0px)); background: #1c2533; color: #fff; padding: 10px 16px; border-radius: 12px; z-index: 80; width: max-content; max-width: 92vw; text-align: center; opacity: 0; pointer-events: none; transition: opacity .2s; font-size: 15px; box-shadow: 0 4px 14px rgba(0,0,0,.25); }
   #toast.on { opacity: 1; }
   #toast.err { background: var(--err); }
-  #loading { position: fixed; inset: 0; background: rgba(255,255,255,.7); z-index: 90; display: none; align-items: center; justify-content: center; flex-direction: column; gap: 10px; }
+  #loading { position: fixed; top: 0; right: 0; bottom: 0; left: 0; background: rgba(255,255,255,.7); z-index: 90; display: none; align-items: center; justify-content: center; flex-direction: column; }
   #loading.on { display: flex; }
-  .spin { width: 38px; height: 38px; border: 4px solid #d6e2f3; border-top-color: var(--pri); border-radius: 50%; animation: sp 0.8s linear infinite; }
+  .spin { width: 38px; height: 38px; margin-bottom: 10px; border: 4px solid #d6e2f3; border-top-color: var(--pri); border-radius: 50%; animation: sp 0.8s linear infinite; }
   @keyframes sp { to { transform: rotate(360deg); } }
+
+  /* จอแคบมาก (≤ 350px) */
+  @media (max-width: 350px) {
+    .wrap { padding-left: 8px; padding-right: 8px; }
+    .card { padding: 12px; }
+    .card.slim { padding: 4px 12px; }
+    .kv { grid-template-columns: 92px 1fr; }
+  }
+
+  /* มือถือรุ่นเก่า (เช่น iOS ก่อน 14.5) ไม่รองรับ gap ของ flex → ใช้ระยะขอบแทน (สคริปต์ใส่ class nogap ให้เมื่อตรวจพบ) */
+  .nogap .row > * + *, .nogap .card-h > * + * { margin-left: 8px; }
+  .nogap .opt > * + * { margin-left: 10px; }
 </style>
 </head>
 <body>
 <header class="top"><div class="in"><h1>🔒 ผู้ดูแลระบบ</h1><div class="school" id="schoolName">ระบบจัดสอนแทน</div></div></header>
 
-<div class="wrap" style="padding-bottom:40px">
-  <div class="card"><a class="link" href="index.html">‹ กลับหน้าจัดสอนแทน</a></div>
+<div class="wrap">
+  <div class="card slim"><a class="link" href="index.html">‹ กลับหน้าจัดสอนแทน</a></div>
 
   <!-- ยังไม่ตั้ง URL ของ API -->
   <div class="card" id="urlBox" style="display:none">
     <div class="card-h"><h2>การเชื่อมต่อ API</h2></div>
     <div class="muted small">วาง URL ของ Apps Script (ลงท้ายด้วย /exec)</div>
     <div class="row" style="margin-top:10px">
-      <input type="text" id="apiUrlInput" class="grow" placeholder="https://script.google.com/macros/s/xxxx/exec" autocomplete="off">
-      <button class="btn sm pri" id="apiUrlSaveBtn">บันทึก</button>
+      <input type="text" id="apiUrlInput" class="grow" placeholder="https://script.google.com/macros/s/xxxx/exec" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url" aria-label="URL ของ Apps Script">
+      <button class="btn sm pri" id="apiUrlSaveBtn" type="button">บันทึก</button>
     </div>
   </div>
 
@@ -142,16 +115,18 @@
   <div class="card" id="setupBox" style="display:none">
     <div class="card-h"><h2>ตั้งรหัสผู้ดูแล</h2></div>
     <div class="muted small">ยังไม่เคยตั้งรหัส — ตั้งเดี๋ยวนี้ <b>ก่อนแจก URL ให้ใคร</b> (อย่างน้อย 6 ตัวอักษร) รหัสนี้ใช้เข้าหน้านี้เท่านั้น ครูไม่ต้องใช้</div>
-    <input type="password" id="newPw" placeholder="รหัสผู้ดูแลใหม่" autocomplete="new-password" style="margin-top:10px">
-    <input type="password" id="newPw2" placeholder="พิมพ์รหัสซ้ำอีกครั้ง" autocomplete="new-password" style="margin-top:8px">
-    <button class="btn pri block" id="setupBtn" style="margin-top:10px">ตั้งรหัสและเข้าสู่ระบบ</button>
+    <input type="password" id="newPw" placeholder="รหัสผู้ดูแลใหม่" autocomplete="new-password" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="next" aria-label="รหัสผู้ดูแลใหม่" style="margin-top:10px">
+    <input type="password" id="newPw2" placeholder="พิมพ์รหัสซ้ำอีกครั้ง" autocomplete="new-password" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="go" aria-label="พิมพ์รหัสซ้ำอีกครั้ง" style="margin-top:8px">
+    <button class="link" type="button" data-show="newPw,newPw2" aria-pressed="false">👁 แสดงรหัส</button>
+    <button class="btn pri block" id="setupBtn" type="button">ตั้งรหัสและเข้าสู่ระบบ</button>
   </div>
 
   <!-- เข้าสู่ระบบ -->
   <div class="card" id="loginBox" style="display:none">
     <div class="card-h"><h2>เข้าสู่ระบบผู้ดูแล</h2></div>
-    <input type="password" id="loginPw" placeholder="รหัสผู้ดูแล" autocomplete="current-password">
-    <button class="btn pri block" id="loginBtn" style="margin-top:10px">เข้าสู่ระบบ</button>
+    <input type="password" id="loginPw" placeholder="รหัสผู้ดูแล" autocomplete="current-password" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="go" aria-label="รหัสผู้ดูแล">
+    <button class="link" type="button" data-show="loginPw" aria-pressed="false">👁 แสดงรหัส</button>
+    <button class="btn pri block" id="loginBtn" type="button">เข้าสู่ระบบ</button>
     <div class="muted small" style="margin-top:8px">ลืมรหัส: ใน Apps Script เปิด “การตั้งค่าโปรเจกต์ → คุณสมบัติของสคริปต์” แล้วลบ ADMIN_HASH และ ADMIN_SALT จากนั้นเปิดหน้านี้ใหม่เพื่อตั้งรหัสใหม่</div>
   </div>
 
@@ -160,14 +135,15 @@
     <div class="card">
       <div class="card-h"><h2>ข้อมูลครูและตารางสอน</h2></div>
       <div class="muted small">แก้รายชื่อครู คาบเรียน ตารางสอน และข้อความตั้งค่า (ชื่อโรงเรียน ผู้จัด ข้อความท้ายประกาศ) ได้ใน Google Sheet แล้วให้ครูกด “โหลดข้อมูลใหม่” ในหน้าจัดสอนแทน</div>
-      <button class="btn line block" id="openSheetBtn" style="margin-top:10px">เปิด Google Sheet</button>
+      <button class="btn line block" id="openSheetBtn" type="button" style="margin-top:10px">เปิด Google Sheet</button>
     </div>
 
     <div class="card" id="impBox">
       <div class="card-h"><h2>นำเข้าตารางสอนจาก PDF</h2></div>
       <div class="muted small">เลือกไฟล์ PDF ตารางสอนที่ <b>เลือกข้อความได้</b> (เช่น ส่งออกจาก Word/Excel — PDF ที่สแกนจากกระดาษอ่านไม่ได้) ระบบอ่านไฟล์ในเครื่องนี้ แล้วแสดงตัวอย่างให้ตรวจก่อนบันทึกลงชีต “ตารางสอน”</div>
-      <input type="file" id="impFile" accept="application/pdf,.pdf" style="margin-top:10px;padding:8px">
-      <div id="impStatus" class="muted small" style="margin-top:8px"></div>
+      <input type="file" id="impFile" class="vh" accept="application/pdf,.pdf">
+      <label class="btn line block" for="impFile" style="margin-top:10px">📄 เลือกไฟล์ PDF</label>
+      <div id="impStatus" class="muted small" role="status" style="margin-top:8px"></div>
       <div id="impPreview" style="display:none"></div>
     </div>
 
@@ -181,29 +157,46 @@
       <div class="muted small" id="cfgState"></div>
       <div id="cfgHow" style="display:none">
         <div class="muted small" style="margin-top:6px">คัดลอกบรรทัดนี้ ไปวางในไฟล์ <b>config.js</b> ของ repo แทนบรรทัด <code class="cmd">apiUrl: ''</code> แล้วกด Commit — ครูทุกคนไม่ต้องกรอก URL อีก</div>
-        <input type="text" id="cfgLine" readonly onclick="this.select()" style="margin-top:8px">
-        <a class="btn line block" href="https://github.com/pdrweb-system/teachtimetables/edit/main/config.js" target="_blank" rel="noopener" style="margin-top:8px;display:flex;align-items:center;justify-content:center;text-decoration:none">เปิดไฟล์ config.js เพื่อแก้</a>
+        <div class="row" style="margin-top:8px">
+          <input type="text" id="cfgLine" class="grow" readonly onclick="this.select()" aria-label="บรรทัด apiUrl สำหรับ config.js">
+          <button class="btn sm line" type="button" data-copy="#cfgLine">คัดลอก</button>
+        </div>
+        <a class="btn line block" href="https://github.com/pdrweb-system/teachtimetables/edit/main/config.js" target="_blank" rel="noopener" style="margin-top:8px">เปิดไฟล์ config.js เพื่อแก้</a>
       </div>
     </div>
 
     <div class="card">
       <div class="card-h"><h2>เปลี่ยนรหัสผู้ดูแล</h2></div>
-      <input type="password" id="oldPw" placeholder="รหัสเดิม" autocomplete="current-password">
-      <input type="password" id="chPw" placeholder="รหัสใหม่ (อย่างน้อย 6 ตัวอักษร)" autocomplete="new-password" style="margin-top:8px">
-      <input type="password" id="chPw2" placeholder="พิมพ์รหัสใหม่ซ้ำ" autocomplete="new-password" style="margin-top:8px">
-      <button class="btn line block" id="changePwBtn" style="margin-top:10px">เปลี่ยนรหัส</button>
+      <input type="password" id="oldPw" placeholder="รหัสเดิม" autocomplete="current-password" autocapitalize="off" autocorrect="off" spellcheck="false" aria-label="รหัสเดิม">
+      <input type="password" id="chPw" placeholder="รหัสใหม่ (อย่างน้อย 6 ตัวอักษร)" autocomplete="new-password" autocapitalize="off" autocorrect="off" spellcheck="false" aria-label="รหัสใหม่" style="margin-top:8px">
+      <input type="password" id="chPw2" placeholder="พิมพ์รหัสใหม่ซ้ำ" autocomplete="new-password" autocapitalize="off" autocorrect="off" spellcheck="false" aria-label="พิมพ์รหัสใหม่ซ้ำ" style="margin-top:8px">
+      <button class="link" type="button" data-show="oldPw,chPw,chPw2" aria-pressed="false">👁 แสดงรหัส</button>
+      <button class="btn line block" id="changePwBtn" type="button">เปลี่ยนรหัส</button>
     </div>
 
-    <div class="card"><button class="btn line block" id="logoutBtn">ออกจากระบบผู้ดูแล</button></div>
+    <div class="card"><button class="btn line block" id="logoutBtn" type="button">ออกจากระบบผู้ดูแล</button></div>
   </div>
 </div>
 
-<div id="toast"></div>
+<div id="toast" role="status" aria-live="polite"></div>
 <div id="loading"><div class="spin"></div><div id="loadingText">กำลังโหลด…</div></div>
 
 <script src="config.js"></script>
 <script src="timetable-import.js"></script>
 <script>
+/* มือถือรุ่นเก่า (เช่น iOS ก่อน 14.5) ไม่รองรับ gap ของ flex → ใส่ class nogap ให้ CSS ใช้ระยะขอบแทน (ชุดเดียวกับ index.html) */
+(function () {
+  try {
+    var f = document.createElement('div');
+    f.style.cssText = 'display:flex;flex-direction:column;row-gap:1px;position:absolute;visibility:hidden';
+    f.appendChild(document.createElement('div'));
+    f.appendChild(document.createElement('div'));
+    document.body.appendChild(f);
+    if (f.scrollHeight !== 1) document.documentElement.className += ' nogap';
+    document.body.removeChild(f);
+  } catch (e) {}
+})();
+
 /* ═══════════════ ส่วนกลาง (ชุดเดียวกับ index.html) ═══════════════ */
 // URL ของ Apps Script: config.js (ตั้งครั้งเดียวทุกเครื่อง) หรือที่กรอกไว้ในเครื่องนี้ (localStorage ใช้ร่วมกับหน้าจัดสอนแทน)
 function cfgUrl() { return (window.APP_CONFIG && window.APP_CONFIG.apiUrl || '').trim(); }
@@ -257,9 +250,52 @@ function loading(on, text) {
 }
 function show(id, on) { $(id).style.display = on ? '' : 'none'; }
 
+/* ─── ปุ่มคัดลอก: <button data-copy="#ช่องที่จะคัดลอก"> (เลือกข้อความแล้วคัดลอกเองบนมือถือทำยาก) ─── */
+function legacyCopy(text) {
+  return new Promise(function (resolve, reject) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;font-size:16px';
+    document.body.appendChild(ta);
+    ta.focus(); ta.select();
+    try { ta.setSelectionRange(0, text.length); } catch (e) {}
+    var ok = false;
+    try { ok = document.execCommand('copy'); } catch (e) {}
+    document.body.removeChild(ta);
+    if (ok) resolve(); else reject(new Error('copy'));
+  });
+}
+function copyText(text) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    return navigator.clipboard.writeText(text).catch(function () { return legacyCopy(text); });
+  }
+  return legacyCopy(text);
+}
+document.addEventListener('click', function (e) {
+  var b = e.target.closest('[data-copy]');
+  if (b) {
+    var src = $(b.getAttribute('data-copy'));
+    if (!src || !src.value) return;
+    copyText(src.value).then(function () { toast('คัดลอกแล้ว ✓'); })
+      .catch(function () { src.focus(); src.select(); toast('คัดลอกอัตโนมัติไม่ได้ — กดค้างที่ข้อความแล้วเลือก “คัดลอก”', true); });
+    return;
+  }
+  // ปุ่ม "แสดงรหัส": พิมพ์รหัสบนมือถือผิดง่าย ให้ดูสิ่งที่พิมพ์ได้
+  b = e.target.closest('[data-show]');
+  if (b) showPw(b, b.getAttribute('aria-pressed') !== 'true');
+});
+function showPw(btn, on) {
+  btn.getAttribute('data-show').split(',').forEach(function (id) { $('#' + id).type = on ? 'text' : 'password'; });
+  btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+  btn.textContent = on ? '🙈 ซ่อนรหัส' : '👁 แสดงรหัส';
+}
+
 /* ═══════════════ สถานะหน้า: ตั้ง URL → ตั้งรหัส → เข้าสู่ระบบ → ผู้ดูแล ═══════════════ */
 function showOnly(which) {
   ['urlBox', 'setupBox', 'loginBox', 'adminBox'].forEach(function (id) { show('#' + id, id === which); });
+  // เปลี่ยนหน้าจอ → กลับไปซ่อนรหัสทุกช่อง
+  Array.prototype.forEach.call(document.querySelectorAll('[data-show]'), function (b) { showPw(b, false); });
 }
 
 function boot() {
@@ -323,6 +359,9 @@ $('#loginBtn').onclick = function () {
   enter(pw).then(function () { $('#loginPw').value = ''; });
 };
 $('#loginPw').addEventListener('keydown', function (e) { if (e.key === 'Enter') $('#loginBtn').click(); });
+// แป้นพิมพ์มือถือ: ปุ่ม "ถัดไป/ไป" พาไปช่องถัดไปหรือกดปุ่มให้เลย
+$('#newPw').addEventListener('keydown', function (e) { if (e.key === 'Enter') $('#newPw2').focus(); });
+$('#newPw2').addEventListener('keydown', function (e) { if (e.key === 'Enter') $('#setupBtn').click(); });
 
 $('#logoutBtn').onclick = function () { ADMIN.pw = ''; saveSession(null); $('#lineBox').innerHTML = ''; showOnly('loginBox'); toast('ออกจากระบบแล้ว'); };
 
@@ -380,17 +419,18 @@ function renderLine(d) {
     '</div>' +
     '<div style="margin-top:14px"><div class="small muted">Webhook URL (นำไปวางใน LINE Developers)</div>' +
     // ใช้ URL /exec ที่หน้านี้เรียกอยู่จริง — ScriptApp.getService().getUrl() ฝั่งเซิร์ฟเวอร์อาจคืน URL อื่น (เช่น /dev)
-    '<input type="text" readonly value="' + h(apiUrl() || d.webAppUrl || '') + '" onclick="this.select()"></div>' +
+    '<div class="row"><input type="text" readonly id="hookUrl" class="grow" value="' + h(apiUrl() || d.webAppUrl || '') + '" onclick="this.select()" aria-label="Webhook URL">' +
+    '<button type="button" class="btn sm line" data-copy="#hookUrl">คัดลอก</button></div></div>' +
     '<div style="margin-top:10px"><div class="small muted">Channel access token (long-lived)</div>' +
-    '<div class="row"><input type="password" id="tokenInput" class="grow" autocomplete="off" placeholder="' + (d.hasToken ? '•••••• (บันทึกแล้ว — วางใหม่เพื่อเปลี่ยน)' : 'วาง token ที่นี่') + '">' +
-    '<button class="btn sm pri" id="saveTokenBtn">บันทึก</button></div></div>' +
+    '<div class="row"><input type="password" id="tokenInput" class="grow" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Channel access token" placeholder="' + (d.hasToken ? '•••••• (บันทึกแล้ว — วางใหม่เพื่อเปลี่ยน)' : 'วาง token ที่นี่') + '">' +
+    '<button type="button" class="btn sm pri" id="saveTokenBtn">บันทึก</button></div></div>' +
     '<h3 style="font-size:16px;margin:18px 0 4px">กลุ่มไลน์ที่ให้บอทตอบ</h3>' +
     '<div class="muted small">บอทตอบคำสั่ง <code class="cmd">แจ้งตารางสอนแทน</code> เฉพาะกลุ่มที่เลือก (กลุ่มอื่นไม่ตอบ) กลุ่มจะโผล่ในรายการเมื่อมีคนพิมพ์อะไรก็ได้ในกลุ่มอย่างน้อย 1 ครั้ง (แล้วกด ↻ รีเฟรช)</div>' +
     ((d.groups || []).length ? '' : '<div class="small" style="color:var(--err);margin-top:6px">ยังไม่เห็นกลุ่มไหนเลย — ดูแถว “รับ event จาก LINE ล่าสุด” ด้านบน: ถ้ายังไม่เคยได้รับ แปลว่า event ยังส่งมาไม่ถึงระบบนี้ (ตรวจ Webhook ใน LINE Developers หรือการส่งต่อจากระบบเดิม และตั้ง Deploy เป็น “ทุกคน”)</div>') +
-    '<select id="groupSel" style="margin-top:8px"><option value="">— ยังไม่เลือก —</option>' + (d.groups || []).map(function (g) {
+    '<select id="groupSel" style="margin-top:8px" aria-label="กลุ่มไลน์ที่ให้บอทตอบ"><option value="">— ยังไม่เลือก —</option>' + (d.groups || []).map(function (g) {
       return '<option value="' + h(g.groupId) + '"' + (g.groupId === d.groupId ? ' selected' : '') + '>' + h((g.name || 'กลุ่มที่ไม่ทราบชื่อ') + (g.lastSeen ? ' · เห็นล่าสุด ' + g.lastSeen.slice(0, 16) : '')) + '</option>';
     }).join('') + '</select>' +
-    '<button class="link" id="loadLineBtn">↻ รีเฟรช</button>';
+    '<button type="button" class="link" id="loadLineBtn">↻ รีเฟรช</button>';
   $('#lineBox').innerHTML = html;
 }
 
@@ -515,16 +555,16 @@ function impRender() {
     }).join('') + '</table></div>';
 
   html += '<h3 style="font-size:16px;margin:16px 0 6px">เวลาคาบ (ชีต “คาบเรียน”)</h3><div class="small">' + b.periods.map(function (p) { return 'คาบ ' + p.p + ': ' + h(p.start) + '–' + h(p.end); }).join(' · ') + '</div>' +
-    '<label style="display:flex;gap:8px;align-items:flex-start;margin-top:8px;font-size:14px"><input type="checkbox" id="optPeriods" style="width:20px;min-height:20px"' + (o.updatePeriods ? ' checked' : '') + '><span>แทนที่ชีต “คาบเรียน” ด้วยเวลาในไฟล์นี้ <span class="muted">(ปัจจุบัน ' + IMP.sheetPeriods.length + ' คาบ)</span></span></label>';
+    '<label class="opt"><input type="checkbox" id="optPeriods"' + (o.updatePeriods ? ' checked' : '') + '><span>แทนที่ชีต “คาบเรียน” ด้วยเวลาในไฟล์นี้ <span class="muted">(ปัจจุบัน ' + IMP.sheetPeriods.length + ' คาบ)</span></span></label>';
 
   html += '<h3 style="font-size:16px;margin:16px 0 6px">ตรวจตัวอย่าง</h3><select id="impView">' + b.teachers.map(function (t) { return '<option value="' + h(t.name) + '"' + (t.name === IMP.view ? ' selected' : '') + '>' + h(t.name) + '</option>'; }).join('') + '</select><div style="margin-top:8px">' + impGrid(b, IMP.view) + '</div>';
 
   html += '<h3 style="font-size:16px;margin:16px 0 6px">วิธีบันทึก</h3>' +
-    '<label style="display:flex;gap:8px;align-items:flex-start;font-size:14px"><input type="radio" name="impMode" value="replace" style="width:20px;min-height:20px"' + (o.mode === 'replace' ? ' checked' : '') + '><span>แทนที่ตารางสอนเดิมทั้งหมด <span class="muted">(สำรองของเดิมไว้ในชีต “สำรองตารางสอน”)</span></span></label>' +
-    '<label style="display:flex;gap:8px;align-items:flex-start;margin-top:6px;font-size:14px"><input type="radio" name="impMode" value="append" style="width:20px;min-height:20px"' + (o.mode === 'append' ? ' checked' : '') + '><span>เพิ่มต่อท้ายตารางเดิม</span></label>' +
-    '<label style="display:flex;gap:8px;align-items:flex-start;margin-top:10px;font-size:14px"><input type="checkbox" id="optSkip" style="width:20px;min-height:20px"' + (o.skipNoRoom ? ' checked' : '') + '><span>ข้ามช่องที่ไม่มีห้อง <span class="muted">(เช่น PLC — ไม่ใช่คาบสอน จะไม่ถูกจัดสอนแทน)</span></span></label>' +
-    (o.mode === 'replace' ? '<label style="display:flex;gap:8px;align-items:flex-start;margin-top:6px;font-size:14px"><input type="checkbox" id="optDeact" style="width:20px;min-height:20px"' + (o.deactivate ? ' checked' : '') + '><span>ปิดใช้งานครูในชีตที่ไม่อยู่ในไฟล์นี้ <span class="muted">(เช่น ครูตัวอย่าง จะไม่ถูกเลือกเป็นผู้สอนแทน)</span></span></label>' : '') +
-    '<button class="btn pri block" id="impGo" style="margin-top:14px">นำเข้า ' + b.rows.length + ' คาบลงชีต</button>';
+    '<label class="opt"><input type="radio" name="impMode" value="replace"' + (o.mode === 'replace' ? ' checked' : '') + '><span>แทนที่ตารางสอนเดิมทั้งหมด <span class="muted">(สำรองของเดิมไว้ในชีต “สำรองตารางสอน”)</span></span></label>' +
+    '<label class="opt"><input type="radio" name="impMode" value="append"' + (o.mode === 'append' ? ' checked' : '') + '><span>เพิ่มต่อท้ายตารางเดิม</span></label>' +
+    '<label class="opt"><input type="checkbox" id="optSkip"' + (o.skipNoRoom ? ' checked' : '') + '><span>ข้ามช่องที่ไม่มีห้อง <span class="muted">(เช่น PLC — ไม่ใช่คาบสอน จะไม่ถูกจัดสอนแทน)</span></span></label>' +
+    (o.mode === 'replace' ? '<label class="opt"><input type="checkbox" id="optDeact"' + (o.deactivate ? ' checked' : '') + '><span>ปิดใช้งานครูในชีตที่ไม่อยู่ในไฟล์นี้ <span class="muted">(เช่น ครูตัวอย่าง จะไม่ถูกเลือกเป็นผู้สอนแทน)</span></span></label>' : '') +
+    '<button type="button" class="btn pri block" id="impGo" style="margin-top:14px">นำเข้า ' + b.rows.length + ' คาบลงชีต</button>';
   box.innerHTML = html;
 }
 

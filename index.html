@@ -3,10 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1f4e8c">
 <title>ระบบจัดสอนแทน</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
+  /* ออกแบบให้ใช้บนมือถือเป็นหลัก: ปุ่ม/ช่องที่แตะได้สูงอย่างน้อย 44px, ตัวอักษรในช่องกรอก ≥ 16px (iOS จะไม่ซูมเอง),
+     เลี่ยง CSS ที่มือถือรุ่นเก่าไม่รู้จัก (เช่น inset) และมีทางสำรองเมื่อไม่รองรับ gap ของ flex (ดู .nogap ท้ายไฟล์) */
   :root {
     --bg: #f2f5fa; --card: #ffffff; --ink: #1c2533; --muted: #6b778a; --line: #e2e8f0;
     --pri: #1f4e8c; --pri2: #2f74c0; --ok: #0b7a3e; --okbg: #e8f6ee; --warn: #b45309; --warnbg: #fff4e0;
@@ -15,12 +18,19 @@
     color-scheme: light;
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  /* แตะปุ่มรัว ๆ (เช่น ‹ ›) ไม่ให้เบราว์เซอร์มือถือซูมหน้าจอ */
+  button, a, select, input, label { touch-action: manipulation; }
+  html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
   html, body { margin: 0; background: var(--bg); color: var(--ink); }
   body { font-family: 'Sarabun', 'Noto Sans Thai', Tahoma, sans-serif; font-size: 16px; line-height: 1.45; }
+  body.noscroll { overflow: hidden; }
+  /* ระหว่างมีการแก้ไขที่ยังไม่บันทึก: ปิดท่า "ดึงลงเพื่อรีเฟรช" (Chrome บนมือถือ) กันข้อมูลหายโดยไม่ตั้งใจ
+     (ตามมาตรฐานต้องตั้งที่ html; Chrome รุ่นเก่าอ่านจาก body) */
+  html.dirty, html.dirty body { overscroll-behavior-y: contain; }
   button, input, select { font: inherit; color: inherit; }
-  .wrap { max-width: 640px; margin: 0 auto; padding: 0 12px calc(150px + var(--safe-b)); }
+  .wrap { max-width: 640px; margin: 0 auto; padding: 0 12px calc(176px + var(--safe-b)); }
 
-  header.top { background: linear-gradient(90deg, var(--pri), var(--pri2)); color: #fff; padding: 14px 16px 16px; }
+  header.top { background: linear-gradient(90deg, var(--pri), var(--pri2)); color: #fff; padding: 12px 16px 14px; padding: calc(12px + env(safe-area-inset-top, 0px)) 16px 14px; }
   header.top .in { max-width: 640px; margin: 0 auto; }
   header.top h1 { margin: 0; font-size: 21px; font-weight: 700; }
   header.top .school { opacity: .85; font-size: 14px; }
@@ -32,69 +42,118 @@
   .small { font-size: 13.5px; }
   .row { display: flex; gap: 8px; align-items: center; }
   .grow { flex: 1; min-width: 0; }
+  .vh { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
   input[type=date], input[type=month], input[type=text], input[type=password], input[type=number], select {
-    width: 100%; min-height: 44px; padding: 8px 10px; border: 1px solid #cfd8e3; border-radius: 10px; background: #fff;
+    width: 100%; min-height: 46px; padding: 8px 10px; border: 1px solid #cfd8e3; border-radius: 10px; background: #fff;
   }
   select { appearance: none; -webkit-appearance: none; padding-right: 30px;
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236b778a' stroke-width='2' fill='none'/%3E%3C/svg%3E");
     background-repeat: no-repeat; background-position: right 10px center; }
   input:focus, select:focus { outline: 2px solid #9cc1f0; border-color: var(--pri2); }
 
-  .btn { min-height: 46px; border: 0; border-radius: 12px; padding: 0 16px; font-weight: 600; cursor: pointer; }
+  .btn { min-height: 48px; border: 0; border-radius: 12px; padding: 0 16px; font-weight: 600; cursor: pointer; }
+  a.btn { display: flex; align-items: center; justify-content: center; text-decoration: none; color: var(--ink); text-align: center; }
   .btn.pri { background: var(--pri); color: #fff; }
   .btn.ok { background: #06c755; color: #fff; }
   .btn.ghost { background: #e8eef7; color: var(--pri); }
   .btn.line { background: #fff; border: 1px solid #cfd8e3; }
-  .btn.sm { min-height: 36px; padding: 0 12px; font-size: 14.5px; border-radius: 10px; }
+  .btn.dashed { background: none; border: 1.5px dashed #a9b9cf; color: var(--pri); }
+  .btn.sm { min-height: 44px; padding: 0 14px; font-size: 15px; border-radius: 10px; }
   .btn:disabled { opacity: .5; }
   .btn.block { width: 100%; }
-  .icon-btn { width: 36px; height: 36px; border-radius: 10px; border: 0; background: #f1f4f9; color: var(--muted); font-size: 18px; cursor: pointer; }
-  .link { background: none; border: 0; color: var(--pri2); font-weight: 600; padding: 8px 0; cursor: pointer; }
+  .icon-btn { width: 44px; height: 44px; flex: none; border-radius: 12px; border: 0; background: #f1f4f9; color: var(--muted); font-size: 18px; cursor: pointer; }
+  .link { background: none; border: 0; color: var(--pri2); font-weight: 600; min-height: 44px; padding: 8px 4px; cursor: pointer; }
+  /* แตะแล้วเห็นว่ากดติด (เพราะปิดแถบไฮไลต์ของเบราว์เซอร์ไว้) */
+  .btn:active, .icon-btn:active, .link:active, .chip:active, .subpick:active, .plist button:active, .dateitem:active, nav.tabbar button:active { opacity: .65; }
 
-  .daynav button { width: 46px; flex: none; }
-  .dayname { margin-top: 8px; font-weight: 600; }
+  /* ── เลือกวัน ── */
+  .daynav { align-items: stretch; }
+  .daynav .navbtn { width: 48px; flex: none; padding: 0; font-size: 24px; min-height: 58px; }
+  .datepick { position: relative; overflow: hidden; display: flex; align-items: center; gap: 8px; min-height: 58px; padding: 6px 12px;
+    border: 1px solid #cfd8e3; border-radius: 12px; background: #fff; cursor: pointer; }
+  .datepick:focus-within { outline: 2px solid #9cc1f0; border-color: var(--pri2); }
+  .datepick .dayname { flex: 1; min-width: 0; line-height: 1.25; }
+  .datepick .wd { display: block; font-weight: 700; font-size: 18px; }
+  .datepick .dt { display: block; color: var(--muted); font-size: 14.5px; }
+  .datepick .cal { font-size: 20px; }
+  /* ช่องวันที่/เดือนของเครื่องวางทับไว้แบบมองไม่เห็น: แตะที่ป้าย = เปิดปฏิทินของมือถือ */
+  .datepick input { position: absolute; top: 0; left: 0; width: 100%; height: 100%; min-height: 0; margin: 0; padding: 0; border: 0; opacity: 0; cursor: pointer;
+    -webkit-appearance: none; appearance: none; }
+  .datepick.plain { cursor: default; }
+  .chips { display: flex; flex-wrap: wrap; align-items: center; margin: 10px -4px -4px; }
+  .chips > * { margin: 0 4px 4px; }
+  .chip { min-height: 44px; padding: 0 18px; border-radius: 999px; border: 1px solid #cfd8e3; background: #fff; font-weight: 600; cursor: pointer; }
+  .chip.on { background: var(--pri); border-color: var(--pri); color: #fff; }
+  .daystate { margin-left: auto !important; text-align: right; }
+  .daystate > * + * { margin-left: 4px; }
 
-  .empty { text-align: center; color: var(--muted); padding: 22px 8px; }
+  /* ── รายการครูที่ไม่อยู่ ── */
+  .empty { text-align: center; color: var(--muted); padding: 18px 8px 6px; }
+  .empty-ic { font-size: 34px; line-height: 1.2; }
   .acard { border: 1px solid var(--line); border-radius: 12px; padding: 12px; margin-top: 10px; }
   .acard-h { display: flex; justify-content: space-between; gap: 8px; align-items: flex-start; }
   .aname { font-weight: 700; font-size: 17px; }
-  .grid2 { display: grid; grid-template-columns: 1fr 1.3fr; gap: 8px; margin-top: 10px; }
-  .slot { border-radius: 10px; padding: 10px; margin-top: 10px; background: var(--warnbg); border-left: 4px solid #f59e0b; }
+  .ok-t { color: var(--ok); font-weight: 600; }
+  .warn-t { color: var(--warn); font-weight: 600; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1.3fr; grid-gap: 8px; gap: 8px; margin-top: 10px; }
+  .slot { border-radius: 12px; padding: 10px; margin-top: 10px; background: var(--warnbg); border-left: 4px solid #f59e0b; }
   .slot.ok { background: var(--okbg); border-left-color: var(--ok); }
   .slot.bad { background: var(--errbg); border-left-color: var(--err); }
-  .slot-h { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
-  .pbadge { background: var(--pri); color: #fff; border-radius: 8px; padding: 1px 9px; font-weight: 600; font-size: 14px; }
-  .ptime { color: var(--muted); font-size: 14px; }
-  .slot-info { font-size: 15px; margin-bottom: 6px; }
-  .custom-grid { display: grid; grid-template-columns: 90px 1fr 1fr; gap: 6px; margin-bottom: 6px; }
-  .custom-grid input, .custom-grid select { min-height: 40px; }
+  .slot-h { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 8px; }
+  .pbadge { flex: none; background: var(--pri); color: #fff; border-radius: 8px; padding: 1px 9px; font-weight: 600; font-size: 14px; white-space: nowrap; }
+  .slot-info { flex: 1; min-width: 0; font-size: 15.5px; font-weight: 600; overflow-wrap: anywhere; }
+  .ptime { flex: none; color: var(--muted); font-size: 13.5px; white-space: nowrap; padding-top: 1px; }
+  .slot-h .icon-btn { margin: -4px -2px -4px 0; }
+  .custom-grid { display: grid; grid-template-columns: 90px 1fr 1fr; grid-gap: 6px; gap: 6px; margin-bottom: 8px; }
+  /* ช่องเลือกครูสอนแทน: แตะแล้วเปิดรายชื่อครูที่ว่าง (แทน select ของเครื่องที่ข้อความยาวจนอ่านไม่ออก) */
+  .subpick { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 48px; padding: 6px 12px; text-align: left;
+    border: 1.5px dashed #e0a43a; border-radius: 10px; background: #fff; cursor: pointer; }
+  .subpick .who { flex: 1; min-width: 0; font-weight: 700; color: var(--warn); overflow-wrap: anywhere; }
+  .subpick .chg { flex: none; color: var(--muted); font-size: 13.5px; white-space: nowrap; }
+  .subpick.has { border: 1px solid #b9dcc7; }
+  .subpick.has .who { color: var(--ok); }
+  .slot.bad .subpick { border: 1.5px solid var(--err); }
+  .slot.bad .subpick .who { color: var(--err); }
+  .conf { color: var(--err); font-size: 13.5px; margin-top: 4px; }
   .tag { display: inline-block; font-size: 12.5px; padding: 0 7px; border-radius: 6px; background: #eef2f7; color: var(--muted); }
 
+  /* ── แถบปุ่มล่าง ── */
   .actionbar { position: fixed; left: 0; right: 0; bottom: calc(62px + var(--safe-b)); z-index: 20; }
-  .actionbar .in { max-width: 640px; margin: 0 auto; padding: 8px 12px; background: rgba(242,245,250,.95); backdrop-filter: blur(6px); }
-  .progress { font-size: 13.5px; color: var(--muted); margin-bottom: 6px; text-align: center; }
+  .actionbar .in { max-width: 640px; margin: 0 auto; padding: 0 12px 8px; background: rgba(242,245,250,.96); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+  .pbar { height: 4px; margin: 0 -12px; background: #dde5f0; }
+  .pbar i { display: block; height: 100%; width: 0; background: var(--ok); transition: width .2s; }
+  .progress { font-size: 13.5px; color: var(--muted); margin: 5px 0; text-align: center; }
   .progress b { color: var(--ink); }
   .actionbar .row .btn { flex: 1; white-space: nowrap; padding: 0 10px; }
   .actionbar .row #autoBtn { flex: 0 0 auto; }
+  body.nowork .actionbar { display: none; }
 
   nav.tabbar { position: fixed; left: 0; right: 0; bottom: 0; background: #fff; border-top: 1px solid var(--line); z-index: 21; padding-bottom: var(--safe-b); }
   nav.tabbar .in { max-width: 640px; margin: 0 auto; display: flex; }
-  nav.tabbar button { flex: 1; height: 62px; border: 0; background: none; color: var(--muted); font-size: 13px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; cursor: pointer; }
-  nav.tabbar button .ic { font-size: 21px; line-height: 1; }
+  nav.tabbar button { flex: 1; height: 62px; border: 0; background: none; color: var(--muted); font-size: 13px; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; }
+  nav.tabbar button .ic { font-size: 21px; line-height: 1; margin-bottom: 2px; }
   nav.tabbar button.on { color: var(--pri); font-weight: 700; }
   .tab { display: none; }
   .tab.on { display: block; }
 
-  .modal { position: fixed; inset: 0; background: rgba(15,25,40,.55); z-index: 50; display: none; align-items: flex-end; justify-content: center; }
+  /* ── หน้าต่างเลื่อนขึ้นจากด้านล่าง ── */
+  .modal { position: fixed; top: 0; right: 0; bottom: 0; left: 0; background: rgba(15,25,40,.55); z-index: 50; display: none; align-items: flex-end; justify-content: center; }
   .modal.on { display: flex; }
-  .sheet { background: #fff; width: 100%; max-width: 640px; max-height: 92vh; border-radius: 18px 18px 0 0; display: flex; flex-direction: column; padding-bottom: var(--safe-b); }
-  .sheet-h { padding: 14px 16px 8px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .sheet { background: #fff; width: 100%; max-width: 640px; max-height: 92vh; max-height: 92dvh; border-radius: 18px 18px 0 0; display: flex; flex-direction: column; padding-bottom: var(--safe-b); }
+  .sheet-h { flex: none; padding: 12px 12px 8px 16px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
   .sheet-h h3 { margin: 0; font-size: 18px; }
-  .sheet-b { padding: 0 16px 12px; overflow-y: auto; }
-  .sheet-f { padding: 10px 16px 14px; border-top: 1px solid var(--line); display: grid; gap: 8px; }
-  .plist button { width: 100%; text-align: left; border: 0; border-bottom: 1px solid var(--line); background: none; padding: 12px 4px; cursor: pointer; display: flex; justify-content: space-between; gap: 8px; }
-  .plist button:disabled { opacity: .4; }
+  .sheet-s { flex: none; padding: 0 16px 8px; }
+  .sheet-b { padding: 0 16px 12px; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
+  .sheet-f { flex: none; padding: 10px 16px 14px; border-top: 1px solid var(--line); display: grid; grid-gap: 8px; gap: 8px; }
+  .sheet-f .row .btn { white-space: nowrap; padding: 0 10px; }
+  .plist button { width: 100%; min-height: 56px; text-align: left; border: 0; border-bottom: 1px solid var(--line); background: none; padding: 10px 4px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .plist button:disabled { opacity: .55; cursor: default; }
+  .plist button.cur { background: var(--okbg); border-radius: 10px; padding-left: 10px; padding-right: 10px; }
+  .plist .tick { flex: none; width: 22px; text-align: center; font-weight: 700; color: var(--ok); }
+  .plist-h { font-size: 13.5px; font-weight: 600; color: var(--muted); padding: 4px 4px 2px; }
+  .plist button.plist-toggle { min-height: 48px; color: var(--pri2); font-weight: 600; justify-content: flex-start; }
+  .linebox { background: var(--okbg); border-radius: 12px; padding: 10px 12px; font-size: 15px; }
   #previewImg { width: 100%; border-radius: 10px; border: 1px solid var(--line); display: block; -webkit-touch-callout: default; }
 
   .stat { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); }
@@ -102,26 +161,48 @@
   .bar { height: 8px; background: #e8eef7; border-radius: 6px; overflow: hidden; margin-top: 4px; }
   .bar i { display: block; height: 100%; background: var(--pri2); border-radius: 6px; }
   .num { font-weight: 700; font-size: 18px; min-width: 36px; text-align: right; }
-  .dateitem { width: 100%; text-align: left; border: 0; background: #f6f8fb; border-radius: 10px; padding: 10px 12px; margin-top: 8px; cursor: pointer; }
+  .dateitem { width: 100%; min-height: 56px; text-align: left; border: 0; background: #f6f8fb; border-radius: 10px; padding: 10px 12px; margin-top: 8px; cursor: pointer; }
 
-  .kv { display: grid; grid-template-columns: 110px 1fr; gap: 6px 10px; font-size: 15px; }
-  .pill { display: inline-block; border-radius: 999px; padding: 1px 10px; font-size: 13px; font-weight: 600; }
+  .kv { display: grid; grid-template-columns: 110px 1fr; grid-gap: 6px 10px; gap: 6px 10px; font-size: 15px; }
+  .pill { display: inline-block; border-radius: 999px; padding: 1px 10px; font-size: 13px; font-weight: 600; white-space: nowrap; }
   .pill.ok { background: var(--okbg); color: var(--ok); }
   .pill.no { background: var(--errbg); color: var(--err); }
   .linkrow { padding: 8px 0; border-bottom: 1px solid var(--line); }
   .linkrow:last-child { border: 0; }
-  code.cmd { background: #eef2f7; border-radius: 6px; padding: 1px 6px; font-family: inherit; font-weight: 600; }
+  code.cmd { background: #eef2f7; border-radius: 6px; padding: 1px 6px; font-family: inherit; font-weight: 600; white-space: nowrap; }
+  .linebox code.cmd { background: #fff; }
+  ol.steps { margin: 0 0 12px; padding-left: 22px; }
+  ol.steps li { margin-bottom: 6px; }
 
-  #toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(150px + var(--safe-b)); background: #1c2533; color: #fff; padding: 10px 16px; border-radius: 12px; z-index: 80; max-width: 92vw; text-align: center; opacity: 0; pointer-events: none; transition: opacity .2s; font-size: 15px; }
+  /* ข้อความแจ้งผล: อยู่ด้านบนจอ ไม่บังปุ่ม/หน้าต่างด้านล่าง */
+  #toast { position: fixed; left: 50%; transform: translateX(-50%); top: 10px; top: calc(10px + env(safe-area-inset-top, 0px)); background: #1c2533; color: #fff; padding: 10px 16px; border-radius: 12px; z-index: 80; width: max-content; max-width: 92vw; text-align: center; opacity: 0; pointer-events: none; transition: opacity .2s; font-size: 15px; box-shadow: 0 4px 14px rgba(0,0,0,.25); }
   #toast.on { opacity: 1; }
   #toast.err { background: var(--err); }
-  #loading { position: fixed; inset: 0; background: rgba(255,255,255,.7); z-index: 90; display: none; align-items: center; justify-content: center; flex-direction: column; gap: 10px; }
+  #loading { position: fixed; top: 0; right: 0; bottom: 0; left: 0; background: rgba(255,255,255,.7); z-index: 90; display: none; align-items: center; justify-content: center; flex-direction: column; }
   #loading.on { display: flex; }
-  .spin { width: 38px; height: 38px; border: 4px solid #d6e2f3; border-top-color: var(--pri); border-radius: 50%; animation: sp 0.8s linear infinite; }
+  .spin { width: 38px; height: 38px; margin-bottom: 10px; border: 4px solid #d6e2f3; border-top-color: var(--pri); border-radius: 50%; animation: sp 0.8s linear infinite; }
   @keyframes sp { to { transform: rotate(360deg); } }
+
+  /* จอแคบมาก (≤ 350px เช่น iPhone SE รุ่นแรก) */
+  @media (max-width: 350px) {
+    .wrap { padding-left: 8px; padding-right: 8px; }
+    .card { padding: 12px; }
+    .grid2 { grid-template-columns: 1fr; }
+    .actionbar .row .btn { font-size: 15px; padding: 0 6px; }
+    .chip { padding: 0 14px; }
+    .ptime { font-size: 12.5px; }
+    .custom-grid { grid-template-columns: 90px 1fr; }
+    .custom-grid > :last-child { grid-column: 1 / -1; }
+    .sheet-f .btn { font-size: 15px; padding: 0 8px; }
+    .sheet-f .btn .em { display: none; }
+  }
+
+  /* มือถือรุ่นเก่า (เช่น iOS ก่อน 14.5) ไม่รองรับ gap ของ flex → ใช้ระยะขอบแทน (สคริปต์ใส่ class nogap ให้เมื่อตรวจพบ) */
+  .nogap .row > * + *, .nogap .card-h > * + *, .nogap .acard-h > * + *, .nogap .slot-h > * + *, .nogap .sheet-h > * + *,
+  .nogap .datepick > * + *, .nogap .subpick > * + *, .nogap .plist button > * + *, .nogap .stat > * + * { margin-left: 8px; }
 </style>
 </head>
-<body>
+<body class="nowork">
 <header class="top"><div class="in"><h1>📋 ระบบจัดสอนแทน</h1><div class="school" id="schoolName">&nbsp;</div></div></header>
 
 <div class="wrap">
@@ -129,17 +210,25 @@
   <section class="tab on" id="tab-plan">
     <div class="card">
       <div class="row daynav">
-        <button class="btn ghost" id="prevDay" aria-label="วันก่อนหน้า">‹</button>
-        <input type="date" id="date" class="grow">
-        <button class="btn ghost" id="nextDay" aria-label="วันถัดไป">›</button>
+        <button class="btn ghost navbtn" id="prevDay" type="button" aria-label="วันก่อนหน้า">‹</button>
+        <label class="datepick grow" for="date">
+          <span class="dayname" id="dayName">&nbsp;</span>
+          <span class="cal" aria-hidden="true">📅</span>
+          <input type="date" id="date" aria-label="เลือกวันที่">
+        </label>
+        <button class="btn ghost navbtn" id="nextDay" type="button" aria-label="วันถัดไป">›</button>
       </div>
-      <div class="dayname" id="dayName">&nbsp;</div>
+      <div class="chips">
+        <button class="chip" id="todayBtn" type="button">วันนี้</button>
+        <button class="chip" id="tomorrowBtn" type="button">พรุ่งนี้</button>
+        <span class="daystate" id="dayState"></span>
+      </div>
     </div>
 
     <div class="card">
       <div class="card-h">
-        <h2>ครูที่ไม่อยู่</h2>
-        <button class="btn sm pri" id="addAbsentBtn">+ เพิ่มครู</button>
+        <h2>ครูที่ไม่อยู่ <span class="muted" id="absentCount"></span></h2>
+        <button class="btn sm pri" id="addAbsentBtn" type="button">+ เพิ่มครู</button>
       </div>
       <div id="absentList"></div>
     </div>
@@ -148,40 +237,57 @@
   <!-- ───────── แท็บสถิติ ───────── -->
   <section class="tab" id="tab-stats">
     <div class="card">
-      <div class="card-h"><h2>สถิติรายเดือน</h2></div>
-      <input type="month" id="statMonth">
+      <div class="row daynav">
+        <button class="btn ghost navbtn" id="prevMonth" type="button" aria-label="เดือนก่อนหน้า">‹</button>
+        <label class="datepick grow" id="monthPick" for="statMonth">
+          <span class="dayname" id="monthName">&nbsp;</span>
+          <span class="cal" id="monthCal" aria-hidden="true">📅</span>
+          <input type="month" id="statMonth" aria-label="เลือกเดือน">
+        </label>
+        <button class="btn ghost navbtn" id="nextMonth" type="button" aria-label="เดือนถัดไป">›</button>
+      </div>
     </div>
     <div class="card">
       <div class="card-h"><h2>ภาระการสอนแทน</h2><span class="muted small">เรียงจากมากไปน้อย</span></div>
       <div id="statTeachers" class="muted small">—</div>
     </div>
     <div class="card">
-      <div class="card-h"><h2>วันที่มีการจัดสอนแทน</h2></div>
+      <div class="card-h"><h2>วันที่มีการจัดสอนแทน</h2><span class="muted small">แตะเพื่อเปิดวันนั้น</span></div>
       <div id="statDates" class="muted small">—</div>
     </div>
   </section>
 
   <!-- ───────── แท็บเพิ่มเติม ───────── -->
   <section class="tab" id="tab-more">
-    <div class="card">
+    <div class="card" id="apiCard">
       <div class="card-h"><h2>การเชื่อมต่อ API</h2></div>
       <div class="muted small" id="apiHint">URL ของ Apps Script (Web app) ที่หน้าเว็บนี้เรียกใช้เป็นฐานข้อมูล — ขอจากผู้ดูแลระบบ</div>
       <div class="row" style="margin-top:10px">
-        <input type="text" id="apiUrlInput" class="grow" placeholder="https://script.google.com/macros/s/xxxx/exec" autocomplete="off">
-        <button class="btn sm pri" id="apiUrlSaveBtn">บันทึก</button>
+        <input type="text" id="apiUrlInput" class="grow" placeholder="https://script.google.com/macros/s/xxxx/exec" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url">
+        <button class="btn sm pri" id="apiUrlSaveBtn" type="button">บันทึก</button>
       </div>
-      <button class="btn line block" id="reloadBtn" style="margin-top:10px">โหลดข้อมูลครู/ตารางสอนใหม่</button>
     </div>
 
     <div class="card">
-      <div class="card-h"><h2>แจ้งในกลุ่มไลน์</h2></div>
-      <div class="small">หลังบันทึกตารางสอนแทนแล้ว พิมพ์ <code class="cmd">แจ้งตารางสอนแทน</code> ในกลุ่มไลน์ บอทจะตอบเป็นการ์ดตารางสอนแทนของวันนี้ (แสดงชื่อครูผู้สอนแทนแต่ละคาบ)</div>
+      <div class="card-h"><h2>วิธีใช้</h2></div>
+      <ol class="steps">
+        <li>เลือกวัน แล้วกด <b>+ เพิ่มครู</b> ที่ไม่อยู่</li>
+        <li>กด <b>⚡ จัดอัตโนมัติ</b> หรือแตะเลือกครูสอนแทนเองทีละคาบ แล้วกด <b>💾 บันทึก</b></li>
+        <li>ส่งคำว่า <code class="cmd">แจ้งตารางสอนแทน</code> ในกลุ่มไลน์ บอทจะตอบเป็นการ์ดตารางสอนแทนของวันนี้</li>
+      </ol>
+      <button class="btn ghost block" id="copyCmdBtn2" type="button">📋 คัดลอกคำว่า “แจ้งตารางสอนแทน”</button>
+    </div>
+
+    <div class="card">
+      <div class="card-h"><h2>ข้อมูลครูและตารางสอน</h2></div>
+      <div class="muted small">ถ้าผู้ดูแลแก้รายชื่อครูหรือตารางสอน กดปุ่มนี้เพื่อดึงข้อมูลล่าสุด</div>
+      <button class="btn line block" id="reloadBtn" type="button" style="margin-top:10px">โหลดข้อมูลครู/ตารางสอนใหม่</button>
     </div>
 
     <div class="card">
       <div class="card-h"><h2>สำหรับผู้ดูแลระบบ</h2></div>
-      <div class="muted small">ตั้งค่า LINE (Token, กลุ่มที่ให้บอทตอบ), แก้ข้อมูลครูและตารางสอน — ต้องใส่รหัสผู้ดูแล</div>
-      <a class="btn line block" href="admin.html" style="margin-top:10px;display:flex;align-items:center;justify-content:center;text-decoration:none">🔒 เข้าหน้าผู้ดูแลระบบ</a>
+      <div class="muted small">ตั้งค่า LINE, นำเข้าตารางสอนจาก PDF, แก้ข้อมูลครู — ต้องใส่รหัสผู้ดูแล</div>
+      <a class="btn line block" id="adminLink" href="admin.html" style="margin-top:10px">🔒 เข้าหน้าผู้ดูแลระบบ</a>
     </div>
   </section>
 </div>
@@ -189,54 +295,81 @@
 <!-- แถบปุ่มล่าง (แท็บจัดสอนแทน) -->
 <div class="actionbar" id="actionBar">
   <div class="in">
+    <div class="pbar" aria-hidden="true"><i id="pbarFill"></i></div>
     <div class="progress" id="progress">&nbsp;</div>
     <div class="row">
-      <button class="btn ghost" id="autoBtn">⚡ จัดอัตโนมัติ</button>
-      <button class="btn pri" id="saveBtn">💾 บันทึก + สร้างภาพ</button>
+      <button class="btn ghost" id="autoBtn" type="button">⚡ จัดอัตโนมัติ</button>
+      <button class="btn pri" id="saveBtn" type="button">💾 บันทึก + สร้างภาพ</button>
     </div>
   </div>
 </div>
 
 <nav class="tabbar"><div class="in">
-  <button class="on" data-tab="plan"><span class="ic">🗓️</span>จัดสอนแทน</button>
-  <button data-tab="stats"><span class="ic">📊</span>สถิติ</button>
-  <button data-tab="more"><span class="ic">☰</span>เพิ่มเติม</button>
+  <button class="on" data-tab="plan" type="button"><span class="ic">🗓️</span>จัดสอนแทน</button>
+  <button data-tab="stats" type="button"><span class="ic">📊</span>สถิติ</button>
+  <button data-tab="more" type="button"><span class="ic">☰</span>เพิ่มเติม</button>
 </div></nav>
 
 <!-- เลือกครูที่ไม่อยู่ -->
 <div class="modal" id="pickModal">
-  <div class="sheet">
-    <div class="sheet-h"><h3>เลือกครูที่ไม่อยู่</h3><button class="icon-btn" data-close="pickModal">✕</button></div>
-    <div class="sheet-b">
-      <input type="text" id="pickSearch" placeholder="🔍 ค้นหาชื่อครู" autocomplete="off">
-      <div class="plist" id="pickList"></div>
-    </div>
+  <div class="sheet" role="dialog" aria-modal="true" aria-label="เลือกครูที่ไม่อยู่">
+    <div class="sheet-h"><h3>เลือกครูที่ไม่อยู่</h3><button class="icon-btn" type="button" data-close="pickModal" aria-label="ปิด">✕</button></div>
+    <div class="sheet-s"><input type="text" id="pickSearch" placeholder="🔍 ค้นหาชื่อครู" autocomplete="off" enterkeyhint="search" aria-label="ค้นหาชื่อครู"></div>
+    <div class="sheet-b"><div class="plist" id="pickList"></div></div>
+  </div>
+</div>
+
+<!-- เลือกครูสอนแทนของคาบ -->
+<div class="modal" id="subModal">
+  <div class="sheet" role="dialog" aria-modal="true" aria-label="เลือกครูสอนแทน">
+    <div class="sheet-h"><div class="grow"><h3>เลือกครูสอนแทน</h3><div class="muted small" id="subCtx"></div></div><button class="icon-btn" type="button" data-close="subModal" aria-label="ปิด">✕</button></div>
+    <div class="sheet-b"><div class="plist" id="subList"></div></div>
+    <div class="sheet-f" id="subFoot"><button class="btn line block" id="subClearBtn" type="button">ยกเลิกผู้สอนแทนของคาบนี้</button></div>
   </div>
 </div>
 
 <!-- ภาพตัวอย่าง -->
 <div class="modal" id="previewModal">
-  <div class="sheet">
-    <div class="sheet-h"><h3>ภาพตารางสอนแทน</h3><button class="icon-btn" data-close="previewModal">✕</button></div>
+  <div class="sheet" role="dialog" aria-modal="true" aria-label="ภาพตารางสอนแทน">
+    <div class="sheet-h"><h3>ภาพตารางสอนแทน</h3><button class="icon-btn" type="button" data-close="previewModal" aria-label="ปิด">✕</button></div>
     <div class="sheet-b">
       <img id="previewImg" alt="ตารางสอนแทน">
-      <div class="muted small" style="margin-top:8px">บนมือถือ: กดค้างที่ภาพ แล้วเลือก “บันทึกรูปภาพ” ได้เลย</div>
+      <div class="muted small" style="margin-top:8px">กดค้างที่ภาพ แล้วเลือก “บันทึกรูปภาพ” ได้เลย</div>
     </div>
     <div class="sheet-f">
-      <div style="background:#e8f6ee;border-radius:12px;padding:10px 12px;font-size:15px">📣 <b>แจ้งในกลุ่มไลน์:</b> พิมพ์ <code class="cmd">แจ้งตารางสอนแทน</code> ในกลุ่ม บอทจะตอบเป็นการ์ดตารางสอนแทน (แสดงชื่อครูผู้สอนแทนแต่ละคาบ) ให้ทันที</div>
+      <div class="linebox">
+        <div>📣 <b>แจ้งในกลุ่มไลน์:</b> ส่งคำว่า <code class="cmd">แจ้งตารางสอนแทน</code> ในกลุ่ม บอทจะตอบเป็นการ์ดตารางสอนแทนให้ทันที</div>
+        <div class="row" style="margin-top:8px">
+          <button class="btn ok grow" id="copyCmdBtn" type="button"><span class="em">📋 </span>คัดลอกคำสั่ง</button>
+          <a class="btn line grow" id="lineOpenBtn" href="https://line.me/R/share?text=%E0%B9%81%E0%B8%88%E0%B9%89%E0%B8%87%E0%B8%95%E0%B8%B2%E0%B8%A3%E0%B8%B2%E0%B8%87%E0%B8%AA%E0%B8%AD%E0%B8%99%E0%B9%81%E0%B8%97%E0%B8%99" target="_blank" rel="noopener">เปิดไลน์เพื่อส่ง</a>
+        </div>
+      </div>
       <div class="row">
-        <button class="btn line grow" id="saveImgBtn">📥 บันทึกภาพ</button>
-        <button class="btn line grow" id="driveBtn">☁️ เปิดใน Drive</button>
+        <button class="btn line grow" id="saveImgBtn" type="button"><span class="em">📥 </span>บันทึกภาพ</button>
+        <button class="btn line grow" id="driveBtn" type="button"><span class="em">☁️ </span>เปิดใน Drive</button>
       </div>
     </div>
   </div>
 </div>
 
-<div id="toast"></div>
+<div id="toast" role="status" aria-live="polite"></div>
 <div id="loading"><div class="spin"></div><div id="loadingText">กำลังโหลด…</div></div>
 
 <script src="config.js"></script>
 <script>
+/* มือถือรุ่นเก่า (เช่น iOS ก่อน 14.5) ไม่รองรับ gap ของ flex → ใส่ class nogap ให้ CSS ใช้ระยะขอบแทน */
+(function () {
+  try {
+    var f = document.createElement('div');
+    f.style.cssText = 'display:flex;flex-direction:column;row-gap:1px;position:absolute;visibility:hidden';
+    f.appendChild(document.createElement('div'));
+    f.appendChild(document.createElement('div'));
+    document.body.appendChild(f);
+    if (f.scrollHeight !== 1) document.documentElement.className += ' nogap';
+    document.body.removeChild(f);
+  } catch (e) {}
+})();
+
 /* ═══════════════ ตั้งค่าการเชื่อมต่อ API ═══════════════ */
 // URL ของ Apps Script (/exec): ใส่ครั้งเดียวใน config.js (ใช้ทุกเครื่อง) — ถ้าเว้นว่างไว้ ใช้ค่าที่กรอกในเครื่องนั้น (localStorage)
 function cfgUrl() { return (window.APP_CONFIG && window.APP_CONFIG.apiUrl || '').trim(); }
@@ -302,12 +435,75 @@ function loading(on, text) {
   $('#loadingText').textContent = text || 'กำลังโหลด…';
   $('#loading').classList.toggle('on', !!on);
 }
-function openModal(id) { $('#' + id).classList.add('on'); }
-function closeModal(id) { $('#' + id).classList.remove('on'); }
+/* ─── หน้าต่างเลื่อนขึ้น (bottom sheet) + ปุ่ม/ท่าปัด "ย้อนกลับ" ของมือถือ ─── */
+// ใช้ขั้นของ history รับปุ่มย้อนกลับ แทนที่จะปล่อยให้ออกจากหน้าเว็บทันที:
+//   • เปิดหน้าต่าง = เพิ่มหนึ่งขั้น → ย้อนกลับ = ปิดหน้าต่าง
+//   • มีการแก้ไขที่ยังไม่บันทึก = มีขั้น "กันออก" หนึ่งขั้น → ย้อนกลับ = ถามก่อนออก
+//     (iPhone ไม่มี beforeunload ให้ใช้ — ไม่มีขั้นนี้ งานที่จัดไว้จะหายเมื่อเผลอปัดย้อนกลับ)
+// ขั้นที่เพิ่มต้องเกิดระหว่างที่ผู้ใช้แตะหน้าจอ: เบราว์เซอร์จะข้ามขั้นที่สคริปต์เพิ่มเองโดยไม่มีการแตะ
+var openModals = [];   // id ของหน้าต่างที่เปิดอยู่ (ตัวล่าสุดอยู่ท้าย)
+var ownBack = 0;       // จำนวน history.back() ที่โค้ดสั่งเอง (ไม่ใช่ผู้ใช้กดย้อนกลับ)
+var ownBackAt = 0;
+var guard = false;     // มีขั้น "กันออก" อยู่หรือไม่
+var rearm = false;     // ผู้ใช้เลือกอยู่ต่อ → ตั้งขั้นกันออกใหม่เมื่อแตะหน้าจอครั้งถัดไป
+var leaving = false;   // ผู้ใช้ยืนยันออกจากหน้าแล้ว (beforeunload ไม่ต้องถามซ้ำ)
+var LEAVE_MSG = 'มีการแก้ไขที่ยังไม่บันทึก ต้องการออกจากหน้านี้หรือไม่?';
+function openModal(id) {
+  var m = $('#' + id);
+  if (m.classList.contains('on')) return;
+  m.classList.add('on');
+  openModals.push(id);
+  document.body.classList.add('noscroll');
+  try { history.pushState({ modal: id }, ''); } catch (e) {}
+}
+function closeModal(id, byBack) {
+  var m = $('#' + id);
+  if (!m.classList.contains('on')) return;
+  m.classList.remove('on');
+  var i = openModals.indexOf(id);
+  if (i >= 0) openModals.splice(i, 1);
+  if (!openModals.length) document.body.classList.remove('noscroll');
+  if (byBack) return;
+  // ปิดด้วยปุ่มในหน้า → จัดการขั้น history ที่เพิ่มไว้ตอนเปิด
+  try {
+    if (!history.state || history.state.modal !== id) return;
+    if (S.dirty && !guard && !openModals.length) { history.replaceState({ guard: 1 }, ''); guard = true; } // ใช้ขั้นนี้เป็นขั้นกันออกต่อ
+    else { ownBack++; ownBackAt = Date.now(); history.back(); }
+  } catch (e) {}
+}
+// ตั้งขั้นกันออก (เรียกจาก markDirty ซึ่งเกิดจากการแตะ/พิมพ์ของผู้ใช้เสมอ)
+function armGuard() {
+  if (guard || openModals.length || !S.dirty) return; // มีหน้าต่างเปิดอยู่: closeModal จะตั้งให้ตอนปิด
+  try {
+    if (!(history.state && history.state.guard)) history.pushState({ guard: 1 }, '');
+    guard = true;
+  } catch (e) {}
+}
+function leaveSoon() { // กำลังออกจากหน้าตามที่ผู้ใช้ยืนยัน; ถ้าสุดท้ายไม่ได้ออก (ไม่มีหน้าก่อนหน้า) ให้กลับมากันตามเดิม
+  leaving = true;
+  setTimeout(function () { leaving = false; rearm = !!S.dirty; }, 1500);
+}
+window.addEventListener('popstate', function () {
+  if (ownBack > 0 && Date.now() - ownBackAt < 1500) { ownBack--; return; }
+  ownBack = 0;
+  if (openModals.length) { closeModal(openModals[openModals.length - 1], true); return; }
+  if (history.state || !guard) return; // ยังอยู่บนขั้นของหน้านี้ (เช่น กดไปข้างหน้า) หรือไม่ได้ตั้งขั้นกันออกไว้
+  // ถอยพ้นขั้นกันออก = ผู้ใช้กำลังจะออกจากหน้า
+  guard = false;
+  if (S.dirty && !confirm(LEAVE_MSG)) { rearm = true; return; }
+  leaveSoon();
+  history.back();
+});
+['click', 'keydown', 'touchend'].forEach(function (ev) {
+  document.addEventListener(ev, function () { if (rearm) { rearm = false; armGuard(); } }, true);
+});
 document.addEventListener('click', function (e) {
   var c = e.target.closest('[data-close]');
   if (c) closeModal(c.getAttribute('data-close'));
-  if (e.target.classList.contains('modal')) e.target.classList.remove('on');
+  else if (e.target.classList.contains('modal')) closeModal(e.target.id); // แตะพื้นหลังมืด = ปิด
+});
+document.addEventListener('keydown', function (e) { // แป้นพิมพ์ (คอมพิวเตอร์/แท็บเล็ต): Esc = ปิดหน้าต่างบนสุด
+  if ((e.key === 'Escape' || e.key === 'Esc') && openModals.length) closeModal(openModals[openModals.length - 1]);
 });
 
 function store(k, v) { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) {} }
@@ -319,7 +515,51 @@ function addDays(ds, n) {
   return d.toISOString().slice(0, 10);
 }
 
+// "วันนี้" ตามเวลาไทยจากนาฬิกาของเครื่อง (ใช้กับปุ่ม วันนี้/พรุ่งนี้ — หน้าที่เปิดค้างข้ามคืนก็ยังถูก)
+function todayStr() {
+  try {
+    var v = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+    if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
+  } catch (e) {}
+  var d = new Date();
+  return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+}
+
 function fail(e) { toast(errMsg(e), true); }
+
+/* ─── คัดลอกคำสั่งสำหรับพิมพ์ในกลุ่มไลน์ ─── */
+var LINE_CMD = 'แจ้งตารางสอนแทน'; // ต้องตรงกับที่บอทรอรับใน Code.gs (handleText_)
+function legacyCopy(text) {
+  return new Promise(function (resolve, reject) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;font-size:16px';
+    document.body.appendChild(ta);
+    ta.focus(); ta.select();
+    try { ta.setSelectionRange(0, text.length); } catch (e) {}
+    var ok = false;
+    try { ok = document.execCommand('copy'); } catch (e) {}
+    document.body.removeChild(ta);
+    if (ok) resolve(); else reject(new Error('copy'));
+  });
+}
+function copyText(text) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    return navigator.clipboard.writeText(text).catch(function () { return legacyCopy(text); });
+  }
+  return legacyCopy(text);
+}
+function copyCmd() {
+  copyText(LINE_CMD).then(function () {
+    toast('คัดลอก “' + LINE_CMD + '” แล้ว — เปิดกลุ่มไลน์แล้ววางส่งได้เลย');
+  }).catch(function () {
+    toast('คัดลอกไม่ได้ — พิมพ์คำว่า ' + LINE_CMD + ' ในกลุ่มไลน์แทน', true);
+  });
+}
+$('#copyCmdBtn').onclick = copyCmd;
+$('#copyCmdBtn2').onclick = copyCmd;
+$('#lineOpenBtn').href = 'https://line.me/R/share?text=' + encodeURIComponent(LINE_CMD);
 
 /* ═══════════════ ตั้งค่า URL ของ API ═══════════════ */
 $('#apiUrlSaveBtn').onclick = function () {
@@ -342,6 +582,7 @@ function boot() {
     $('#apiUrlInput').readOnly = true;
     $('#apiUrlSaveBtn').style.display = 'none';
     $('#apiHint').textContent = 'URL นี้ตั้งไว้กลางในระบบแล้ว (config.js) ไม่ต้องกรอกในเครื่องนี้';
+    $('#tab-more').appendChild($('#apiCard')); // ครูไม่ต้องใช้การ์ดนี้ → ย้ายไปไว้ล่างสุด
   }
   if (!apiUrl()) {
     $('#absentList').innerHTML = '<div class="empty">ยังไม่ได้ตั้งค่า URL ของ Apps Script<br>ไปที่แท็บ “เพิ่มเติม” ด้านล่างเพื่อกรอก URL ก่อนใช้งาน</div>';
@@ -353,7 +594,7 @@ function boot() {
   return run('getInitData').then(function (init) {
     applyInit(init);
     $('#date').value = init.today;
-    $('#statMonth').value = init.today.slice(0, 7);
+    setMonth(init.today.slice(0, 7));
     return loadDate(init.today, true).then(function () { return true; });
   }).catch(function (e) {
     toast(errMsg(e), true);
@@ -381,9 +622,37 @@ function loadDate(date, skipConfirm) {
     .then(function () { loading(false); });
 }
 
-$('#date').addEventListener('change', function () { if (this.value) loadDate(this.value); });
-$('#prevDay').onclick = function () { if (S.date) { $('#date').value = addDays(S.date, -1); loadDate($('#date').value); } };
-$('#nextDay').onclick = function () { if (S.date) { $('#date').value = addDays(S.date, 1); loadDate($('#date').value); } };
+function gotoDate(d) { if (!S.init) return; $('#date').value = d; loadDate(d); }
+// บนคอมพิวเตอร์ การคลิกช่องวันที่/เดือน (ที่วางทับป้ายไว้แบบมองไม่เห็น) ไม่เปิดปฏิทินเอง → สั่งเปิดให้; บนมือถือแตะแล้วเปิดเองอยู่แล้ว
+function pickerOnClick(el) {
+  el.addEventListener('click', function () {
+    if (el.showPicker && window.matchMedia && window.matchMedia('(pointer: fine)').matches) { try { el.showPicker(); } catch (e) {} }
+  });
+}
+// ปฏิทินของมือถือบางรุ่นมีปุ่ม "ล้าง" → ได้ค่าว่าง ให้คงวันเดิมไว้
+$('#date').addEventListener('change', function () { if (this.value) loadDate(this.value); else this.value = S.date; });
+pickerOnClick($('#date'));
+$('#prevDay').onclick = function () { if (S.date) gotoDate(addDays(S.date, -1)); };
+$('#nextDay').onclick = function () { if (S.date) gotoDate(addDays(S.date, 1)); };
+$('#todayBtn').onclick = function () { gotoDate(todayStr()); };
+$('#tomorrowBtn').onclick = function () { gotoDate(addDays(todayStr(), 1)); };
+
+// เปิดหน้าค้างไว้ข้ามคืน (แท็บในมือถือมักไม่ถูกปิด): กลับมาเปิดอีกวันให้ไปที่ "วันนี้" เอง
+// — เฉพาะเมื่อยังดูวันเดิมอยู่และไม่มีงานค้าง จะได้ไม่เผลอจัดสอนแทนลงวันเมื่อวาน
+var seenDay = todayStr();
+function checkNewDay() {
+  if (document.hidden || !S.init || !S.dd) return;
+  var t = todayStr();
+  if (t === seenDay) return;
+  var was = seenDay;
+  seenDay = t;
+  if (!S.dirty && !openModals.length && S.date === was) {
+    $('#date').value = t;
+    loadDate(t, true).then(function () { if (S.date === t) toast('ขึ้นวันใหม่แล้ว — แสดงรายการของวันนี้'); });
+  } else renderState();
+}
+document.addEventListener('visibilitychange', checkNewDay);
+window.addEventListener('pageshow', checkNewDay);
 
 /* ═══════════════ แผนสอนแทน ═══════════════ */
 function inTimetable(name, period) {
@@ -455,40 +724,70 @@ function autoAssign() {
 }
 $('#autoBtn').onclick = autoAssign;
 
-function markDirty() { S.dirty = true; S.img = null; S.imgDrive = null; }
+// มีการแก้ไขที่ยังไม่บันทึก (เรียกก่อน closeModal เสมอ เพื่อให้ขั้นกันออกถูกตั้งตอนปิดหน้าต่าง)
+function markDirty() { S.dirty = true; S.img = null; S.imgDrive = null; armGuard(); }
 
 /* ═══════════════ แสดงผล ═══════════════ */
 function render() {
-  var weekend = /เสาร์|อาทิตย์/.test(S.dd.weekday);
-  $('#dayName').innerHTML = h(S.dd.thaiDate) + (weekend ? ' <span class="tag">วันหยุด</span>' : '') +
-    (S.dd.subs.length && !S.dirty ? ' <span class="pill ok">บันทึกแล้ว</span>' : '') +
-    (S.dirty ? ' <span class="pill no">ยังไม่บันทึก</span>' : '');
   var box = $('#absentList');
   if (!S.plan.length) {
-    box.innerHTML = '<div class="empty">ยังไม่มีครูที่ไม่อยู่ในวันนี้<br>กด <b>+ เพิ่มครู</b> เพื่อเริ่มจัดสอนแทน</div>';
+    box.innerHTML = '<div class="empty"><div class="empty-ic">🗓️</div>ยังไม่มีครูที่ไม่อยู่ในวันนี้' +
+      '<button type="button" class="btn pri block" data-act="addAbsent" style="margin-top:14px">+ เพิ่มครูที่ไม่อยู่</button></div>';
   } else {
-    box.innerHTML = S.plan.map(absentHTML).join('');
+    // ปุ่มเพิ่มครูอยู่ท้ายรายการด้วย (ไม่ต้องเลื่อนกลับขึ้นไปบนสุด)
+    box.innerHTML = S.plan.map(absentHTML).join('') +
+      '<button type="button" class="btn dashed block" data-act="addAbsent" style="margin-top:12px">+ เพิ่มครูที่ไม่อยู่อีกคน</button>';
   }
+  renderState();
+}
+
+// ส่วนที่ไม่ต้องสร้างรายการใหม่: ป้ายวัน/สถานะ แถบความคืบหน้า ข้อความบนปุ่มบันทึก
+// (เรียกได้ระหว่างพิมพ์ โดยไม่ทำให้ช่องที่กำลังพิมพ์หลุดโฟกัส/แป้นพิมพ์ปิด)
+function renderState() {
+  var weekend = /เสาร์|อาทิตย์/.test(S.dd.weekday);
+  var parts = S.dd.thaiDate.split('ที่ ');
+  $('#dayName').innerHTML = parts.length === 2
+    ? '<span class="wd">' + h(parts[0]) + '</span><span class="vh">ที่ </span><span class="dt">' + h(parts[1]) + '</span>'
+    : '<span class="wd">' + h(S.dd.thaiDate) + '</span>';
+  $('#dayState').innerHTML = (weekend ? '<span class="tag">วันหยุด</span>' : '') +
+    (S.dirty ? '<span class="pill no">ยังไม่บันทึก</span>' : (S.dd.subs.length ? '<span class="pill ok">บันทึกแล้ว</span>' : ''));
+  var today = todayStr();
+  $('#todayBtn').classList.toggle('on', S.date === today);
+  $('#tomorrowBtn').classList.toggle('on', S.date === addDays(today, 1));
+  $('#absentCount').textContent = S.plan.length ? '(' + S.plan.length + ' คน)' : '';
+
   var total = 0, done = 0, bad = 0;
   S.plan.forEach(function (a) { a.slots.forEach(function (s) { total++; if (s.sub) done++; if (slotConflict(s)) bad++; }); });
-  $('#progress').innerHTML = total
+  var d = S.date.split('-');
+  var shortDate = 'วัน' + S.dd.weekday + ' ' + Number(d[2]) + ' ' + TH_MONTHS[Number(d[1]) - 1];
+  $('#progress').innerHTML = h(shortDate) + ' · ' + (total
     ? 'จัดแล้ว <b>' + done + '/' + total + '</b> คาบ' + (bad ? ' · <span style="color:var(--err)">ชน ' + bad + '</span>' : '')
-    : (S.plan.length ? 'ไม่มีคาบที่ต้องจัด' : '&nbsp;');
+    : (S.plan.length ? 'ไม่มีคาบที่ต้องจัด' : 'ไม่มีครูในรายการ'));
+  $('#pbarFill').style.width = (total ? Math.round(done / total * 100) : 0) + '%';
+  $('#saveBtn').textContent = (!S.dirty && S.dd.subs.length) ? '🖼️ ดูภาพ / แจ้งไลน์'
+    : (S.plan.length ? '💾 บันทึก + สร้างภาพ' : '💾 บันทึก (ล้างรายการวันนี้)');
+  // แถบปุ่มล่างแสดงเมื่อมีอะไรให้บันทึกหรือดู (มีครูในรายการ หรือวันนั้นเคยบันทึกไว้)
+  document.body.classList.toggle('nowork', !(S.plan.length || S.dd.subs.length));
+  document.documentElement.classList.toggle('dirty', !!S.dirty);
 }
 
 function absentHTML(a, ai) {
   var t = S.tmap[a.absent] || {};
+  var name = t.display || a.absent;
   var reasons = S.init.reasons.map(function (r) { return '<option' + (r === a.reason ? ' selected' : '') + '>' + h(r) + '</option>'; }).join('');
   if (a.reason && S.init.reasons.indexOf(a.reason) < 0) reasons += '<option selected>' + h(a.reason) + '</option>';
+  var open = a.slots.filter(function (s) { return !s.sub; }).length;
+  var sum = a.slots.length
+    ? a.slots.length + ' คาบ · ' + (open ? '<span class="warn-t">ยังไม่จัด ' + open + '</span>' : '<span class="ok-t">จัดครบแล้ว</span>')
+    : 'ไม่มีคาบสอนในวันนี้';
   return '<div class="acard">' +
-    '<div class="acard-h"><div><div class="aname">' + h(t.display || a.absent) + '</div>' +
-    '<div class="muted small">' + h(t.dept || '') + (t.dept ? ' · ' : '') + a.slots.length + ' คาบ</div></div>' +
-    '<button class="icon-btn" data-act="rmAbsent" data-ai="' + ai + '" aria-label="ลบ">✕</button></div>' +
-    '<div class="grid2"><select data-f="reason" data-ai="' + ai + '">' + reasons + '</select>' +
-    '<input type="text" data-f="note" data-ai="' + ai + '" placeholder="หมายเหตุ" value="' + h(a.note) + '"></div>' +
-    (a.slots.length ? a.slots.map(function (s, si) { return slotHTML(a, ai, s, si); }).join('')
-      : '<div class="muted small" style="margin-top:10px">ไม่มีคาบสอนในวันนี้</div>') +
-    '<button class="link" data-act="addSlot" data-ai="' + ai + '">+ เพิ่มคาบ/ภาระงาน</button>' +
+    '<div class="acard-h"><div class="grow"><div class="aname">' + h(name) + '</div>' +
+    '<div class="muted small">' + h(t.dept || '') + (t.dept ? ' · ' : '') + sum + '</div></div>' +
+    '<button type="button" class="icon-btn" data-act="rmAbsent" data-ai="' + ai + '" aria-label="ลบ ' + h(name) + ' ออกจากรายการ">✕</button></div>' +
+    '<div class="grid2"><select data-f="reason" data-ai="' + ai + '" aria-label="เหตุผลที่ไม่อยู่">' + reasons + '</select>' +
+    '<input type="text" data-f="note" data-ai="' + ai + '" placeholder="หมายเหตุ (ถ้ามี)" value="' + h(a.note) + '" enterkeyhint="done" aria-label="หมายเหตุ"></div>' +
+    a.slots.map(function (s, si) { return slotHTML(a, ai, s, si); }).join('') +
+    '<button type="button" class="link" data-act="addSlot" data-ai="' + ai + '">+ เพิ่มคาบ/ภาระงานอื่น</button>' +
     '</div>';
 }
 
@@ -498,32 +797,30 @@ function slotHTML(a, ai, s, si) {
   var cls = conflict ? 'bad' : (s.sub ? 'ok' : '');
   var attrs = ' data-ai="' + ai + '" data-si="' + si + '"';
   var head = '<div class="slot-h"><span class="pbadge">คาบ ' + (s.period || '-') + '</span>' +
-    '<span class="ptime grow">' + (p ? h(p.start + '–' + p.end) : '') + '</span>' +
-    (s.custom ? '<button class="icon-btn" data-act="rmSlot"' + attrs + ' aria-label="ลบคาบ">🗑</button>' : '') + '</div>';
-  var info;
+    '<span class="slot-info">' + (s.custom ? (s.period ? '' : '<span class="muted small" style="font-weight:400">เลือกคาบด้านล่าง</span>') : h([s.room, s.subject].filter(Boolean).join(' · ') || '-')) + '</span>' +
+    '<span class="ptime">' + (p ? h(p.start + '–' + p.end) : '') + '</span>' +
+    (s.custom ? '<button type="button" class="icon-btn" data-act="rmSlot"' + attrs + ' aria-label="ลบคาบนี้">🗑</button>' : '') + '</div>';
+  var custom = '';
   if (s.custom) {
     var popts = '<option value="">คาบ</option>' + S.init.periods.map(function (x) {
       return '<option value="' + x.p + '"' + (x.p === s.period ? ' selected' : '') + '>' + x.p + '</option>';
     }).join('');
-    info = '<div class="custom-grid"><select data-f="period"' + attrs + '>' + popts + '</select>' +
-      '<input type="text" data-f="room"' + attrs + ' placeholder="ห้อง" value="' + h(s.room) + '">' +
-      '<input type="text" data-f="subject"' + attrs + ' placeholder="วิชา/งาน" value="' + h(s.subject) + '"></div>';
-  } else {
-    info = '<div class="slot-info">' + h([s.room, s.subject].filter(Boolean).join(' · ') || '-') + '</div>';
+    custom = '<div class="custom-grid"><select data-f="period"' + attrs + ' aria-label="คาบ">' + popts + '</select>' +
+      '<input type="text" data-f="room"' + attrs + ' placeholder="ห้อง" value="' + h(s.room) + '" aria-label="ห้อง">' +
+      '<input type="text" data-f="subject"' + attrs + ' placeholder="วิชา/งาน" value="' + h(s.subject) + '" aria-label="วิชาหรืองาน"></div>';
   }
-  var cands = sortCands(candidates(s), a.absent);
-  var opts = '<option value="">— เลือกครูสอนแทน (ว่าง ' + cands.length + ' คน) —</option>';
-  var hasCur = false;
-  opts += cands.map(function (t) {
-    if (t.name === s.sub) hasCur = true;
-    var tc = teachCount(t.name), sc = subsToday(t.name, s), mc = monthCount(t.name);
-    var label = t.display + ' — แทนวันนี้ ' + sc + ' · เดือนนี้ ' + (mc + sc) + ' · สอนเอง ' + tc;
-    return '<option value="' + h(t.name) + '"' + (t.name === s.sub ? ' selected' : '') + '>' + h(label) + '</option>';
-  }).join('');
-  if (s.sub && !hasCur) opts += '<option value="' + h(s.sub) + '" selected>⚠ ' + h(disp(s.sub)) + '</option>';
-  return '<div class="slot ' + cls + '">' + head + info +
-    '<select data-f="sub"' + attrs + '>' + opts + '</select>' +
-    (conflict ? '<div class="small" style="color:var(--err);margin-top:4px">⚠ ' + h(conflict) + '</div>' : '') +
+  // ช่องผู้สอนแทน: แตะแล้วเปิดรายชื่อครูที่ว่างในคาบนั้น (openSubPicker)
+  var pick;
+  if (s.sub) {
+    pick = '<button type="button" class="subpick has" data-act="pickSub"' + attrs + '>' +
+      '<span class="who">' + (conflict ? '⚠ ' : '✓ ') + h(disp(s.sub)) + '</span><span class="chg">เปลี่ยน ›</span></button>';
+  } else {
+    var n = candidates(s).length;
+    pick = '<button type="button" class="subpick" data-act="pickSub"' + attrs + '>' +
+      '<span class="who">+ เลือกครูสอนแทน</span><span class="chg">' + (n ? 'ว่าง ' + n + ' คน' : 'ไม่มีครูว่าง') + ' ›</span></button>';
+  }
+  return '<div class="slot ' + cls + '">' + head + custom + pick +
+    (conflict ? '<div class="conf">⚠ ' + h(conflict) + '</div>' : '') +
     '</div>';
 }
 
@@ -537,24 +834,27 @@ listBox.addEventListener('change', function (e) {
   var el = e.target, f = el.getAttribute('data-f');
   if (!f) return;
   var t = target(el);
+  if (f === 'period') { t.s.period = Number(el.value) || 0; markDirty(); render(); return; } // คาบเปลี่ยน → ครูที่ว่างเปลี่ยน
   if (f === 'reason') t.a.reason = el.value;
   else if (f === 'note') t.a.note = el.value;
-  else if (f === 'sub') { t.s.sub = el.value; markDirty(); render(); return; }
-  else if (f === 'period') { t.s.period = Number(el.value) || 0; markDirty(); render(); return; }
   else if (f === 'room' || f === 'subject') t.s[f] = el.value;
-  markDirty(); render();
+  // ช่องข้อความ/เหตุผล: ไม่สร้างรายการใหม่ (ถ้าสร้างใหม่ตอนแตะช่องถัดไป ช่องนั้นจะหลุดโฟกัสและแป้นพิมพ์ปิด)
+  markDirty(); renderState();
 });
 listBox.addEventListener('input', function (e) {
   var el = e.target, f = el.getAttribute('data-f');
   if (f !== 'note' && f !== 'room' && f !== 'subject') return;
   var t = target(el);
   if (f === 'note') t.a.note = el.value; else t.s[f] = el.value;
-  S.dirty = true; S.img = null;
+  markDirty(); renderState();
 });
 listBox.addEventListener('click', function (e) {
   var el = e.target.closest('[data-act]');
   if (!el) return;
-  var act = el.getAttribute('data-act'), t = target(el);
+  var act = el.getAttribute('data-act');
+  if (act === 'addAbsent') { openPick(); return; }
+  var t = target(el);
+  if (act === 'pickSub') { openSubPicker(t.a, t.s); return; }
   if (act === 'rmAbsent') {
     if (!confirm('ลบ ' + disp(t.a.absent) + ' ออกจากรายการ?')) return;
     S.plan.splice(S.plan.indexOf(t.a), 1);
@@ -567,13 +867,17 @@ listBox.addEventListener('click', function (e) {
 });
 
 /* เลือกครูที่ไม่อยู่ */
-$('#addAbsentBtn').onclick = function () {
-  if (!S.dd) return;
+function openPick() {
+  if (!S.dd || !S.init) return;
   $('#pickSearch').value = '';
   renderPick();
   openModal('pickModal');
-};
+  $('#pickModal .sheet-b').scrollTop = 0;
+}
+$('#addAbsentBtn').onclick = openPick;
 $('#pickSearch').addEventListener('input', renderPick);
+// กดปุ่ม "ค้นหา" บนแป้นพิมพ์มือถือ = เก็บแป้นพิมพ์ ให้เห็นรายชื่อเต็มจอ
+$('#pickSearch').addEventListener('keydown', function (e) { if (e.key === 'Enter') this.blur(); });
 function renderPick() {
   var q = $('#pickSearch').value.trim();
   var inPlan = {};
@@ -581,8 +885,8 @@ function renderPick() {
   var list = S.init.teachers.filter(function (t) { return t.active && (!q || (t.name + ' ' + t.display + ' ' + t.dept).indexOf(q) >= 0); });
   $('#pickList').innerHTML = list.length ? list.map(function (t) {
     var tc = teachCount(t.name);
-    return '<button data-name="' + h(t.name) + '"' + (inPlan[t.name] ? ' disabled' : '') + '>' +
-      '<span><b>' + h(t.display) + '</b><br><span class="muted small">' + h(t.dept || t.name) + '</span></span>' +
+    return '<button type="button" data-name="' + h(t.name) + '"' + (inPlan[t.name] ? ' disabled' : '') + '>' +
+      '<span class="grow"><b>' + h(t.display) + '</b><br><span class="muted small">' + h(t.dept || t.name) + '</span></span>' +
       '<span class="muted small">' + (inPlan[t.name] ? 'เลือกแล้ว' : (tc ? 'สอน ' + tc + ' คาบ' : 'ไม่มีคาบ')) + '</span></button>';
   }).join('') : '<div class="empty">ไม่พบชื่อครู</div>';
 }
@@ -593,9 +897,96 @@ $('#pickList').addEventListener('click', function (e) {
   // ถ้าครูท่านนี้ถูกจัดเป็นผู้สอนแทนไว้ ให้ล้างออก
   S.plan.forEach(function (a) { a.slots.forEach(function (s) { if (s.sub === name) s.sub = ''; }); });
   S.plan.push({ absent: name, reason: S.init.reasons[0], note: '', slots: timetableSlots(name) });
+  markDirty();
   closeModal('pickModal');
-  markDirty(); render();
+  render();
 });
+
+/* ═══════════════ เลือกครูสอนแทนของคาบ ═══════════════ */
+var subSel = null;        // { a: ครูที่ไม่อยู่, s: คาบที่กำลังเลือกผู้สอนแทน }
+var subShowBusy = false;  // กางรายชื่อครูที่ไม่ว่างอยู่หรือไม่
+
+// เหตุผลที่ครูคนนี้เลือกไม่ได้ในคาบนี้ (ตรงกับเงื่อนไขของ candidates/slotConflict)
+function whyBusy(t, slot) {
+  var i, j;
+  for (i = 0; i < S.plan.length; i++) {
+    if (S.plan[i].absent === t.name) return 'ไม่อยู่วันนี้' + (S.plan[i].reason ? ' (' + S.plan[i].reason + ')' : '');
+  }
+  if (slot.period) {
+    var own = S.dd.timetable.filter(function (x) { return x.teacher === t.name && x.period === slot.period; })[0];
+    if (own) return 'มีสอน ' + ([own.room, own.subject].filter(Boolean).join(' ') || 'คาบนี้');
+    for (i = 0; i < S.plan.length; i++) {
+      for (j = 0; j < S.plan[i].slots.length; j++) {
+        var x = S.plan[i].slots[j];
+        if (x !== slot && x.sub === t.name && x.period === slot.period) return 'สอนแทน' + disp(S.plan[i].absent) + 'ในคาบนี้แล้ว';
+      }
+    }
+  }
+  return 'ไม่ว่าง';
+}
+
+function openSubPicker(a, s) {
+  subSel = { a: a, s: s };
+  subShowBusy = !!(s.sub && slotConflict(s)); // คนที่เลือกไว้กลายเป็นไม่ว่าง → กางให้เห็นเหตุผลเลย
+  renderSubPicker();
+  openModal('subModal');
+  $('#subModal .sheet-b').scrollTop = 0;
+}
+
+function renderSubPicker() {
+  var a = subSel.a, s = subSel.s, p = S.pmap[s.period];
+  var where = [s.room, s.subject].filter(Boolean).join(' ');
+  $('#subCtx').textContent = 'คาบ ' + (s.period || '-') + (p ? ' (' + p.start + '–' + p.end + ')' : '') + (where ? ' · ' + where : '') + ' · แทน' + disp(a.absent);
+  var free = sortCands(candidates(s), a.absent);
+  var isFree = {};
+  free.forEach(function (t) { isFree[t.name] = true; });
+  var busy = S.init.teachers.filter(function (t) { return t.active && !isFree[t.name]; });
+  var html = '';
+  if (free.length) {
+    html += '<div class="plist-h">ครูที่ว่างในคาบนี้ ' + free.length + ' คน (เรียงจากภาระน้อยไปมาก)</div>';
+    html += free.map(function (t, i) {
+      var tc = teachCount(t.name), sc = subsToday(t.name, s), mc = monthCount(t.name), cur = t.name === s.sub;
+      return '<button type="button" data-name="' + h(t.name) + '"' + (cur ? ' class="cur"' : '') + '>' +
+        '<span class="grow"><b>' + h(t.display) + '</b>' + (i === 0 ? ' <span class="pill ok">แนะนำ</span>' : '') +
+        // \u00a0 = เว้นวรรคไม่ตัดบรรทัด: จอแคบให้ตัดบรรทัดที่จุดคั่น ไม่ใช่กลางคู่ "คำ ตัวเลข"
+        '<br><span class="muted small">' + h(t.dept ? t.dept + ' · ' : '') + 'แทนวันนี้\u00a0' + sc + ' · เดือนนี้\u00a0' + (mc + sc) + ' · สอนเอง\u00a0' + tc + '\u00a0คาบ</span></span>' +
+        '<span class="tick">' + (cur ? '✓' : '') + '</span></button>';
+    }).join('');
+  } else {
+    html += '<div class="empty">ไม่มีครูว่างในคาบนี้</div>';
+  }
+  if (busy.length) {
+    html += '<button type="button" class="plist-toggle" data-toggle="busy" aria-expanded="' + (subShowBusy ? 'true' : 'false') + '">' +
+      (subShowBusy ? '▾' : '▸') + ' ครูที่ไม่ว่างในคาบนี้ ' + busy.length + ' คน</button>';
+    if (subShowBusy) {
+      html += busy.map(function (t) {
+        var cur = t.name === s.sub;
+        return '<button type="button" disabled' + (cur ? ' class="cur"' : '') + '><span class="grow"><b>' + h(t.display) + '</b>' +
+          '<br><span class="small">' + h(whyBusy(t, s)) + '</span></span><span class="tick">' + (cur ? '⚠' : '') + '</span></button>';
+      }).join('');
+    }
+  }
+  $('#subList').innerHTML = html;
+  $('#subFoot').style.display = s.sub ? '' : 'none';
+}
+$('#subList').addEventListener('click', function (e) {
+  if (!subSel) return;
+  if (e.target.closest('[data-toggle]')) { subShowBusy = !subShowBusy; renderSubPicker(); return; }
+  var b = e.target.closest('button[data-name]');
+  if (!b || b.disabled) return;
+  var name = b.getAttribute('data-name');
+  var changed = subSel.s.sub !== name;
+  if (changed) { subSel.s.sub = name; markDirty(); }
+  closeModal('subModal');
+  if (changed) render();
+});
+$('#subClearBtn').onclick = function () {
+  if (!subSel) return;
+  subSel.s.sub = '';
+  markDirty();
+  closeModal('subModal');
+  render();
+};
 
 /* ═══════════════ บันทึก ═══════════════ */
 $('#saveBtn').onclick = function () {
@@ -624,7 +1015,13 @@ $('#saveBtn').onclick = function () {
   }).catch(function (e) { loading(false); fail(e); });
 };
 
-window.addEventListener('beforeunload', function (e) { if (S.dirty) { e.preventDefault(); e.returnValue = ''; } });
+window.addEventListener('beforeunload', function (e) { if (S.dirty && !leaving) { e.preventDefault(); e.returnValue = ''; } });
+// ลิงก์ออกไปหน้าอื่น (หน้าผู้ดูแล): ถามเองก่อน เพราะ iPhone ไม่มี beforeunload
+$('#adminLink').addEventListener('click', function (e) {
+  if (!S.dirty) return;
+  if (!confirm(LEAVE_MSG)) { e.preventDefault(); return; }
+  leaveSoon();
+});
 
 /* ═══════════════ สร้างภาพ ═══════════════ */
 function segs(text) {
@@ -823,9 +1220,33 @@ function showTab(name) {
 }
 
 /* ═══════════════ สถิติ ═══════════════ */
-$('#statMonth').addEventListener('change', loadStats);
+var TH_MONTHS_FULL = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
+var statMonth = ''; // เดือนที่กำลังดู (yyyy-MM)
+// ป้ายเดือนเป็นภาษาไทย + พ.ศ. (ช่องเลือกเดือนของเครื่องแสดงตามภาษาเครื่อง และบางเบราว์เซอร์ไม่มีให้ใช้ → มีปุ่ม ‹ › เสมอ)
+function setMonth(m) {
+  if (!/^\d{4}-\d{2}$/.test(m)) return;
+  statMonth = m;
+  $('#statMonth').value = m;
+  var p = m.split('-');
+  $('#monthName').innerHTML = '<span class="wd">' + TH_MONTHS_FULL[Number(p[1]) - 1] + ' ' + (Number(p[0]) + 543) + '</span><span class="dt">สถิติรายเดือน</span>';
+}
+function addMonths(m, n) {
+  var p = m.split('-').map(Number);
+  return new Date(Date.UTC(p[0], p[1] - 1 + n, 1)).toISOString().slice(0, 7);
+}
+if ($('#statMonth').type !== 'month') { // ไม่มีช่องเลือกเดือน (เช่น Firefox/Safari บนคอมพิวเตอร์) → ใช้ปุ่ม ‹ › อย่างเดียว
+  $('#statMonth').style.display = 'none';
+  $('#monthCal').style.display = 'none';
+  $('#monthPick').classList.add('plain');
+}
+pickerOnClick($('#statMonth'));
+$('#statMonth').addEventListener('change', function () {
+  if (/^\d{4}-\d{2}$/.test(this.value)) { setMonth(this.value); loadStats(); } else this.value = statMonth;
+});
+$('#prevMonth').onclick = function () { if (statMonth) { setMonth(addMonths(statMonth, -1)); loadStats(); } };
+$('#nextMonth').onclick = function () { if (statMonth) { setMonth(addMonths(statMonth, 1)); loadStats(); } };
 function loadStats() {
-  var m = $('#statMonth').value;
+  var m = statMonth;
   if (!m) return;
   loading(true);
   run('getStats', m).then(function (st) {
@@ -853,6 +1274,7 @@ $('#statDates').addEventListener('click', function (e) {
 
 /* ═══════════════ เพิ่มเติม ═══════════════ */
 $('#reloadBtn').onclick = function () {
+  if (S.dirty && !confirm('มีการแก้ไขที่ยังไม่บันทึก — โหลดข้อมูลใหม่แล้วการแก้ไขนี้จะหายไป ต้องการโหลดหรือไม่?')) return;
   loading(true);
   run('getInitData').then(function (init) { applyInit(init); return loadDate(S.date || init.today, true); })
     .then(function () { toast('โหลดข้อมูลใหม่แล้ว ✓'); })
