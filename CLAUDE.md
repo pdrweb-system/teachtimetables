@@ -32,13 +32,13 @@ LINE ──webhook POST {destination,events}──► /exec เดียวก�
 | ไฟล์ | หน้าที่ |
 |---|---|
 | `index.html` | หน้าครู: จัดสอนแทน / สถิติ / เพิ่มเติม (HTML+CSS+JS ไฟล์เดียว, ไม่มี build step) — ขึ้น GitHub Pages |
-| `admin.html` | หน้าผู้ดูแล: เข้าสู่ระบบ/ตั้งรหัสครั้งแรก → LINE token, เลือกกลุ่ม, เปลี่ยนรหัส (ไฟล์เดียว; โค้ด `run`/toast/loading ซ้ำกับ index.html — แก้ที่ใดต้องดูอีกที่ด้วย) |
+| `admin.html` | หน้าผู้ดูแล: เข้าสู่ระบบ/ตั้งรหัสครั้งแรก → LINE token, เลือกกลุ่ม, นำเข้า PDF, เปลี่ยนรหัส (ไฟล์เดียว; โค้ด `run`/toast/loading/คัดลอก/ตรวจ flex-gap และ CSS พื้นฐาน ซ้ำกับ index.html — แก้ที่ใดต้องดูอีกที่ด้วย; CSS ของหน้านี้มีเฉพาะ class ที่หน้านี้ใช้) |
 | `apps-script/Code.gs` | Backend JSON API + LINE webhook — **คัดลอกไปวางใน Apps Script เอง** (ไม่ได้ deploy อัตโนมัติจาก repo) |
 | `tests/gasmock.js` | Mock ของ SpreadsheetApp/DriveApp/UrlFetchApp/ฯลฯ ในหน่วยความจำ ให้รัน Code.gs ใน Node ได้ |
 | `tests/api.test.js` | ทดสอบ API ผ่าน doGet/doPost แบบเดียวกับที่ index.html เรียก — `node tests/api.test.js` |
 | `tests/flex.test.js` | ทดสอบคำสั่ง `แจ้งตารางสอนแทน` + ตัวตรวจ Flex (property/ค่า/ขนาด) — `node tests/flex.test.js [--dump]` |
 | `tests/import.test.js` | ทดสอบตัวอ่าน PDF กับ `tests/fixtures/timetable-sample.pdf` (ข้อมูลสมมติ สร้างด้วย `tests/fixtures/make_timetable_pdf.py` + reportlab; commit ผลลัพธ์ไว้) — `REAL_PDF=ไฟล์ node tests/import.test.js` ลองกับไฟล์จริง (ห้าม commit ไฟล์จริง) |
-| `tests/e2e.test.js` | ทดสอบหน้าเว็บทั้ง flow ใน Chromium กับ Code.gs จริง — `node tests/e2e.test.js [โฟลเดอร์ภาพ]` |
+| `tests/e2e.test.js` | ทดสอบหน้าเว็บทั้ง flow ใน Chromium กับ Code.gs จริง — `node tests/e2e.test.js [โฟลเดอร์ภาพ]` (ต้องใช้ Playwright ≥ 1.45 เพราะใช้ `page.clock`) |
 | `README.md` | คู่มือผู้ใช้ (ภาษาไทย) สำหรับสถาปัตยกรรมปัจจุบัน: ติดตั้ง, Deploy, GitHub Pages, LINE, อัปเดตจากเวอร์ชันเดิม, FAQ |
 | `config.js` | ตั้งค่ากลาง `window.APP_CONFIG = { apiUrl }` — โหลดก่อนสคริปต์หลักทั้ง index.html และ admin.html (ห้ามใส่ความลับ: เป็นไฟล์สาธารณะ) |
 | `timetable-import.js` | ตัวอ่านตารางสอนจาก PDF (UMD ES5, ไม่ผูก DOM): `parsePage(items)` อ่านทีละหน้าด้วยตำแหน่ง x/y จาก pdf.js, `build(pages, opts)` รวมเป็นแถว+คาบ+ครู+คำเตือน, `matchTeacher`, `cleanTeacher`, `fromPdfItems` — ใช้ทั้งหน้า admin และเทสต์ Node |
@@ -49,6 +49,7 @@ LINE ──webhook POST {destination,events}──► /exec เดียวก�
 ## สถานะปัจจุบัน
 
 **เสร็จแล้ว**
+- 2026-11-14: ปรับ UI ให้ใช้ง่ายบนมือถือ (ผู้ใช้สั่ง "ปรับหน้า ui ให้ใช้งานง่ายในมือถือ") ทั้ง index.html และ admin.html — รายละเอียดในหัวข้อ "หน้าเว็บ"; **Code.gs ไม่ได้แก้** (ไม่ต้อง Deploy ใหม่); เทสต์ API 73, Flex 40, import 22, e2e 80
 - เวอร์ชันแรก (Apps Script HtmlService: `Code.gs` + `Index.html`) ทำครบทุกฟีเจอร์ ทดสอบด้วย mock แล้ว
 - แปลงเป็น GitHub Pages + API: `index.html` push ขึ้น repo แล้ว (commit `4cc1957`, 2026-09-27) — แทน `google.script.run` ด้วย `fetch()` และมีช่องกรอก URL API ในแท็บตั้งค่า
 - `apps-script/Code.gs` เวอร์ชัน API อยู่ในโฟลเดอร์นี้ ผ่าน `tests/api.test.js` 19 ข้อ (เวอร์ชันนี้สร้างใหม่ให้ตรงกับ index.html — **ถ้าใน Apps Script ของผู้ใช้มี Code.gs ที่แก้เองไว้ ให้เทียบกับตัวนั้นก่อนทับ**)
@@ -135,14 +136,29 @@ Script Properties: `SS_ID`, `FOLDER_ID` (โฟลเดอร์ Drive "ภา�
 
 ## หน้าเว็บ (index.html)
 
-- state กลางอยู่ใน `S` (`init`, `date`, `dd`, `plan`, `dirty`, `img`, `imgDrive`); render ใหม่ทั้งรายการด้วย `render()` + event delegation
-- URL ของ API: `cfgUrl()` อ่านจาก `config.js` (`window.APP_CONFIG.apiUrl`, ตั้งครั้งเดียวใช้ทุกเครื่อง — ผู้ใช้สั่ง 2026-11-13; ไฟล์เป็นสาธารณะ = URL เปิดเผย) ถ้าว่างใช้ localStorage `apiUrl` (กรอกต่อเครื่อง); `apiUrl() = cfgUrl() || load('apiUrl')` ทั้ง index.html และ admin.html; ตั้งใน config.js แล้วช่องกรอกในหน้า index ถูกล็อก; e2e ทดสอบโดยให้ server ทดสอบเสิร์ฟ `/config.js` แทน (`globalThis.__configJs`)
-- แท็บ (index.html): จัดสอนแทน / สถิติ / เพิ่มเติม (URL API, โหลดข้อมูลใหม่, คำสั่งไลน์, ลิงก์ไป admin.html); modal แบบ bottom sheet (เลือกครู, ภาพ)
+- state กลางอยู่ใน `S` (`init`, `date`, `dd`, `plan`, `dirty`, `img`, `imgDrive`); `render()` สร้างรายการครูที่ไม่อยู่ใหม่ทั้งหมด แล้วเรียก `renderState()` (ป้ายวัน/สถานะ, แถบความคืบหน้า, ข้อความปุ่มบันทึก, class `nowork` ที่ body และ `dirty` ที่ html) + event delegation
+- **ช่องข้อความ (หมายเหตุ/ห้อง/วิชา) และเหตุผล เรียกแค่ `markDirty(); renderState()` — ห้ามเรียก `render()` ใน `change`/`input` ของช่องพวกนี้**: ถ้าสร้างรายการใหม่ตอนผู้ใช้แตะช่องถัดไป ช่องนั้นจะหลุดโฟกัสและแป้นพิมพ์มือถือปิด (e2e มีข้อทดสอบ "พิมพ์ห้องแล้วแตะช่องวิชา"); เปลี่ยน "คาบ" ของคาบที่เพิ่มเองเท่านั้นที่ `render()` (ครูที่ว่างเปลี่ยน)
+- URL ของ API: `cfgUrl()` อ่านจาก `config.js` (`window.APP_CONFIG.apiUrl`, ตั้งครั้งเดียวใช้ทุกเครื่อง — ผู้ใช้สั่ง 2026-11-13; ไฟล์เป็นสาธารณะ = URL เปิดเผย) ถ้าว่างใช้ localStorage `apiUrl` (กรอกต่อเครื่อง); `apiUrl() = cfgUrl() || load('apiUrl')` ทั้ง index.html และ admin.html; ตั้งใน config.js แล้วช่องกรอกในหน้า index ถูกล็อกและการ์ด "การเชื่อมต่อ API" ถูกย้ายไปล่างสุดของแท็บ เพิ่มเติม; e2e ทดสอบโดยให้ server ทดสอบเสิร์ฟ `/config.js` แทน (`globalThis.__configJs`)
+- แท็บ (index.html): จัดสอนแทน / สถิติ / เพิ่มเติม (วิธีใช้ + ปุ่มคัดลอกคำสั่ง, โหลดข้อมูลใหม่, ลิงก์ไป admin.html, URL API); หน้าต่างแบบ bottom sheet 3 ตัว: `#pickModal` (เลือกครูที่ไม่อยู่ + ค้นหา), `#subModal` (เลือกครูสอนแทนของคาบ), `#previewModal` (ภาพ + แจ้งไลน์)
 - **จัดอัตโนมัติ** (`autoAssign`): เรียงคาบจากเช้าไปเย็น เลือกครูว่างที่ `score` ต่ำสุด = สอนแทนเดือนนี้ + สอนแทนวันนี้×2 + คาบสอนเอง×0.3, เสมอกันให้กลุ่มสาระเดียวกับครูที่ลาก่อน
 - ครูว่าง (`candidates`) = ใช้งานอยู่ ∧ ไม่ได้ลา ∧ ไม่มีคาบตัวเองในคาบนั้น ∧ ยังไม่ถูกจัดคาบนั้น; `slotConflict` แสดงแถบแดง
 - **ภาพ** วาดด้วย canvas 1080px (`drawImage`), ตัดบรรทัดภาษาไทยด้วย `Intl.Segmenter('th')` (มี regex fallback), ฟอนต์ Sarabun จาก Google Fonts, ส่งออก JPEG 0.92
 - หลังเปิดภาพตัวอย่าง จะอัปโหลดลง Drive เบื้องหลังเพื่อให้ปุ่ม "ดูภาพตาราง" ในการ์ด `แจ้งตารางสอนแทน` มีภาพ
 - โค้ดฝั่งหน้าเว็บเขียนแบบ ES5 (`var`, `function`) เพื่อรองรับมือถือเก่า — คงสไตล์นี้ไว้
+
+### UI สำหรับมือถือ (ปรับ 2026-11-14 ตามที่ผู้ใช้สั่ง — ใช้กับ admin.html ด้วยเท่าที่เกี่ยว)
+
+- **ที่แตะได้ทุกจุดสูง/กว้าง ≥ 44px** (`.btn` 48, `.btn.sm`/`.icon-btn`/`.link`/`.chip` 44, ช่องกรอก 46) และตัวอักษรในช่องกรอก 16px (เล็กกว่านี้ iOS จะซูมหน้าเอง) — e2e ตรวจด้วย `smallTargets()` ทั้งหน้าจัดสอนแทน หน้าภาพ และหน้า admin; ตรวจไม่ล้นจอที่ 390/360/320px
+- **เลือกครูสอนแทน = ปุ่ม `.subpick` ต่อคาบ → เปิด `#subModal`** (`openSubPicker`/`renderSubPicker`): ครูที่ว่างเรียงด้วย `sortCands` (คนแรกมีป้าย "แนะนำ" = คนเดียวกับที่จัดอัตโนมัติจะเลือก), บรรทัดภาระ "แทนวันนี้ · เดือนนี้ · สอนเอง", ส่วนพับ "ครูที่ไม่ว่าง" บอกเหตุผลจาก `whyBusy` (ต้องตรงกับเงื่อนไขใน `candidates`), ปุ่ม "ยกเลิกผู้สอนแทนของคาบนี้" — เดิมเป็น `<select>` ของเครื่องซึ่งข้อความยาวจนถูกตัดอ่านไม่ออกบนมือถือ **อย่าเปลี่ยนกลับเป็น select**
+- **เลือกวัน**: ป้ายวันภาษาไทย (`#dayName`) โดยมี `input[type=date]` โปร่งใสวางทับ (แตะ = ปฏิทินของเครื่อง; บนคอมพิวเตอร์เรียก `showPicker()`), ปุ่ม ‹ ›, ปุ่ม วันนี้/พรุ่งนี้ (`todayStr()` = วันที่ตามเวลาไทยจาก**นาฬิกาเครื่อง** ไม่ใช่ `init.today`), ป้ายสถานะ `#dayState` (วันหยุด / ยังไม่บันทึก / บันทึกแล้ว); เดือนในแท็บสถิติใช้แบบเดียวกัน (`setMonth`, ‹ ›, ซ่อนช่องเลือกเดือนถ้าเบราว์เซอร์ไม่รองรับ `type=month`)
+- **เปิดหน้าค้างข้ามคืน** (`checkNewDay` ตอน `visibilitychange`/`pageshow`): ถ้าวันเปลี่ยน และยังดูวันเดิมอยู่ ไม่มีงานค้าง ไม่มีหน้าต่างเปิด → โหลด "วันนี้" ของวันใหม่ให้เอง (กันจัดลงวันเมื่อวานโดยไม่ตั้งใจ)
+- **ปุ่ม/ท่าปัดย้อนกลับของมือถือ** (ตัวแปร `openModals`, `ownBack`, `guard`, `rearm`, `leaving`): เปิดหน้าต่าง = `history.pushState({modal})` → ย้อนกลับ = ปิดหน้าต่าง; มีการแก้ไขที่ยังไม่บันทึก = มีขั้น `{guard:1}` → ย้อนกลับ = `confirm` ถามก่อนออก (จำเป็นเพราะ iOS ไม่มี `beforeunload`); ตอบอยู่ต่อ → ตั้งขั้นกันออกใหม่ตอนแตะหน้าจอครั้งถัดไป (`rearm`); ตอบออก/ไม่มีงานค้าง → `history.back()` ต่อให้เอง (`leaving` กัน `beforeunload` ถามซ้ำ)
+  - **`pushState` ต้องเกิดระหว่างที่ผู้ใช้แตะ/พิมพ์** (Chrome/Safari ข้ามขั้นที่สคริปต์เพิ่มเองโดยไม่มีการแตะ) → `markDirty()` เรียก `armGuard()` และ**ต้องเรียก `markDirty()` ก่อน `closeModal()` เสมอ** (ตอนปิดหน้าต่าง `closeModal` จะ `replaceState` ขั้นของหน้าต่างเป็นขั้นกันออก แทนการ `history.back()`)
+  - ทดสอบได้ด้วย `page.goBack()` (e2e มี 5 ข้อ); ของจริงบน iPhone/LINE in-app browser ยังไม่ได้ลอง
+- **แจ้งไลน์โดยไม่ต้องพิมพ์**: ปุ่ม "คัดลอกคำสั่ง" (`copyText`: `navigator.clipboard` → สำรองด้วย `execCommand('copy')`) และลิงก์ "เปิดไลน์เพื่อส่ง" = `https://line.me/R/share?text=<คำสั่ง>` (รูปแบบ URL scheme ของ LINE จากความจำ — **ยืนยันกับเอกสาร/เครื่องจริงไม่ได้ใน sandbox** เพราะ developers.line.biz ถูกบล็อก; ถ้าใช้ไม่ได้ผู้ใช้ยังคัดลอกไปวางได้); คำสั่งอยู่ในค่าคงที่ `LINE_CMD` ต้องตรงกับ `handleText_` ใน Code.gs
+- ข้อความแจ้งผล (`#toast`) อยู่**ด้านบน**จอ (ด้านล่างมีแถบปุ่ม/แป้นพิมพ์บัง); แถบปุ่มล่างซ่อนเมื่อยังไม่มีอะไรให้บันทึก (`body.nowork`); ระหว่างมีงานค้างปิดท่าดึงลงเพื่อรีเฟรช (`html.dirty { overscroll-behavior-y: contain }`)
+- **รองรับมือถือรุ่นเก่า**: ไม่ใช้ `inset` (ใช้ top/right/bottom/left), `gap` ของ flex มีทางสำรอง (สคริปต์ต้นไฟล์ใส่ class `nogap` ที่ `<html>` แล้ว CSS ท้ายไฟล์ใช้ margin แทน — เพิ่ม flex ที่ใช้ gap ใหม่ต้องเพิ่มในกฎ `.nogap` ด้วย), `92dvh` มี `92vh` นำหน้า, จอ ≤ 350px มี media query ของตัวเอง
+- admin.html: ปุ่ม "เลือกไฟล์ PDF" เป็น `<label for="impFile">` (ช่องเลือกไฟล์จริงซ่อนด้วย `.vh` — **ต้องอยู่ก่อน label** เพราะ CSS ใช้ `input:focus + label`), ปุ่มคัดลอก (`data-copy="#id"`), ปุ่มแสดงรหัส (`data-show="id,id"`; `showOnly()` สั่งกลับไปซ่อนทุกครั้งที่เปลี่ยนหน้าจอ), ตัวเลือกนำเข้าใช้ class `.opt` (ทั้งแถวแตะได้)
 
 ## ข้อควรระวัง
 
@@ -160,10 +176,12 @@ Script Properties: `SS_ID`, `FOLDER_ID` (โฟลเดอร์ Drive "ภา�
 ## การทดสอบ
 
 - `node tests/api.test.js`, `node tests/flex.test.js` และ `node tests/import.test.js` (ต้อง `npm i pdfjs-dist@3.11.174` ในโฟลเดอร์ที่รัน — ไม่มีก็ข้ามส่วนที่ใช้ PDF) — ต้องผ่านทุกข้อก่อน commit การแก้ Code.gs/timetable-import.js; e2e (`pdfjs-dist` ใช้ทดสอบนำเข้า PDF ในเบราว์เซอร์โดยดัก cdnjs มาเสิร์ฟไฟล์ใน node_modules)
-- `node tests/e2e.test.js [โฟลเดอร์ภาพ]` — ทดสอบหน้าเว็บทั้ง flow (ตั้ง URL → เพิ่มครู → จัดอัตโนมัติ → ภาพ → หน้าผู้ดูแล: ตั้งรหัส/เข้า-ออก/เปลี่ยนรหัส/LINE → ส่งไลน์ → สถิติ) บน viewport 390×844 กับ Code.gs จริง; ให้รันทุกครั้งที่แก้ index.html หรือ Code.gs ใส่โฟลเดอร์ภาพเพื่อดู `preview.jpg`/screenshot
+- `node tests/e2e.test.js [โฟลเดอร์ภาพ]` — ทดสอบหน้าเว็บทั้ง flow (ตั้ง URL → เลือกวัน → เพิ่มครู → เลือกครูสอนแทนเอง/จัดอัตโนมัติ → ปุ่มย้อนกลับ/กันงานหาย → ภาพ + คัดลอกคำสั่ง → หน้าผู้ดูแล: ตั้งรหัส/เข้า-ออก/เปลี่ยนรหัส/LINE/นำเข้า PDF → สถิติ) บน viewport 390×844 (+ ตรวจจอ 360/320) กับ Code.gs จริง; ให้รันทุกครั้งที่แก้ index.html, admin.html หรือ Code.gs ใส่โฟลเดอร์ภาพเพื่อดู `preview.jpg`/screenshot
   - หน้าเว็บกับ API ใช้ http server ในเครื่องคนละ origin; API ตอบ 302 ไป `/macros/echo` แบบ Apps Script และตอบ OPTIONS ด้วย 405 (จับ CORS preflight ได้)
   - ใช้ server จริงแทน `page.route` เพราะ Playwright route **ไม่ดักคำขอที่ตามหลัง redirect** (คำขอ echo จะหลุดออกเน็ตแล้วล้ม)
-  - "วันนี้" ของ backend ถูกตรึงเป็น 2026-09-28 (วันจันทร์) โดยแทน `todayStr_` ในเทสต์
+  - "วันนี้" ของ backend ถูกตรึงเป็น 2026-09-28 (วันจันทร์) โดยแทน `todayStr_` ในเทสต์ และนาฬิกาของเบราว์เซอร์ถูกตรึงวันเดียวกันด้วย `page.clock.setFixedTime` (ปุ่ม วันนี้/พรุ่งนี้ ใช้นาฬิกาเครื่อง; ตรึงเฉพาะ `Date` — timer ยังเดิน)
+  - กล่องถาม (`confirm`/`beforeunload`) ตอบตกลงอัตโนมัติ; ตั้ง `dialogMode = 'dismiss'` เพื่อทดสอบกรณีตอบยกเลิก และดูข้อความที่ถามได้จาก `dialogs`; คลิปบอร์ดใช้ได้เพราะ `grantPermissions(['clipboard-read','clipboard-write'])`
+  - ปุ่มย้อนกลับทดสอบด้วย `page.goBack()` — ไปขั้นก่อนหน้าตรง ๆ จึง**ไม่จำลองการที่เบราว์เซอร์จริงข้ามขั้น history ที่เพิ่มโดยไม่มีการแตะ** (ดูหัวข้อ UI สำหรับมือถือ)
 - ฟอนต์ Sarabun: sandbox ไม่มี internet ไป Google Fonts → `npm i @fontsource/sarabun` ในโฟลเดอร์ที่รันคำสั่ง (เช่น scratchpad แล้วรัน `node /path/to/tests/e2e.test.js` จากที่นั่น) เทสต์จะดัก `fonts.googleapis.com` มาใช้ไฟล์ local ให้เอง; ถ้าไม่มีจะใช้ฟอนต์สำรอง (เทสต์ยังผ่าน)
 
 ## ไอเดียต่อยอด (ยังไม่ได้ทำ)

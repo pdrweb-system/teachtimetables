@@ -1,6 +1,6 @@
 // ทดสอบหน้าเว็บ index.html แบบ end-to-end ใน Chromium (Playwright) กับ apps-script/Code.gs จริง (ผ่าน tests/gasmock.js)
 // รัน: node tests/e2e.test.js [โฟลเดอร์สำหรับเก็บภาพผลลัพธ์]
-//   - ต้องมี playwright (เครื่องที่ยังไม่มี: npm i -D playwright && npx playwright install chromium)
+//   - ต้องมี playwright 1.45 ขึ้นไป (ใช้ page.clock ตรึงวันที่ของเบราว์เซอร์; เครื่องที่ยังไม่มี: npm i -D playwright && npx playwright install chromium)
 //   - ฟอนต์ Sarabun: npm i @fontsource/sarabun (ถ้าไม่มี ภาพจะใช้ฟอนต์สำรองของระบบ — ผลทดสอบยังใช้ได้)
 // จำลองให้เหมือนของจริง: หน้าเว็บกับ API อยู่คนละ origin (ตรวจ CORS), API ตอบ 302 ไป /macros/echo แบบ Apps Script
 // และไม่รองรับ OPTIONS (ถ้าหน้าเว็บยิง CORS preflight จะล้มทันที)
@@ -104,16 +104,36 @@ const lineEvent = (events) => doPost({ postData: { contents: JSON.stringify({ de
     if (!pdfjsDir || !fs.existsSync(path.join(pdfjsDir, f))) return route.abort();
     return route.fulfill({ contentType: 'text/javascript', headers: { 'Access-Control-Allow-Origin': '*' }, body: fs.readFileSync(path.join(pdfjsDir, f)) });
   });
+  await context.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: PAGE.replace(/\/$/, '') });
   const page = await context.newPage();
   page.on('pageerror', (e) => log.errors.push('pageerror: ' + e.message));
   page.on('console', (m) => { if (m.type() === 'error') log.errors.push('console: ' + m.text()); });
-  page.on('dialog', (d) => d.accept());
+  // กล่องถาม (confirm / beforeunload): ปกติตอบตกลง — ตั้ง dialogMode = 'dismiss' เพื่อทดสอบกรณีตอบยกเลิก
+  const dialogs = [];
+  let dialogMode = 'accept';
+  page.on('dialog', (d) => { dialogs.push(d.type() + ': ' + d.message()); return dialogMode === 'dismiss' ? d.dismiss() : d.accept(); });
+  // นาฬิกาของเบราว์เซอร์ = DATE เช่นเดียวกับ backend (ปุ่ม วันนี้/พรุ่งนี้ ของหน้าเว็บใช้นาฬิกาเครื่อง); ตรึงเฉพาะ Date — timer ยังเดินปกติ
+  const setClock = (date) => page.clock.setFixedTime(new Date(date + 'T08:00:00+07:00'));
+  await setClock(DATE);
 
   let passed = 0;
   const ok = (cond, msg) => { assert.ok(cond, msg); passed++; console.log('  ✓ ' + msg); };
   const idle = () => page.waitForFunction(() => !document.querySelector('#loading').classList.contains('on'));
   const toastHas = (text) => page.waitForFunction((t) => document.querySelector('#toast').textContent.indexOf(t) >= 0, text);
   const shot = (name) => OUT && page.screenshot({ path: path.join(OUT, name) });
+  const hasClass = (sel, cls) => page.$eval(sel, (e, c) => e.classList.contains(c), cls);
+  const closed = (id) => page.waitForFunction((i) => !document.getElementById(i).classList.contains('on'), id);
+  // ที่แตะได้ซึ่งเล็กกว่า 44px (ช่องติ๊ก/ปุ่มเลือกนับทั้งแถวของ label; ช่องที่ซ่อนไว้ไม่นับ)
+  const smallTargets = (scope) => page.evaluate((sc) => {
+    const out = [];
+    document.querySelectorAll(sc).forEach((root) => {
+      root.querySelectorAll('button, select, a, label.btn, label.opt, label.datepick, input:not(.vh):not([type=checkbox]):not([type=radio]):not([type=date]):not([type=month])').forEach((el) => {
+        const r = el.getBoundingClientRect();
+        if (r.width && r.height && (r.width < 44 || r.height < 44)) out.push((el.id || el.className || el.tagName) + ' ' + Math.round(r.width) + 'x' + Math.round(r.height));
+      });
+    });
+    return out;
+  }, scope);
   if (OUT) fs.mkdirSync(OUT, { recursive: true });
   if (!hasFont) console.log('  (ไม่พบ @fontsource/sarabun — ภาพจะใช้ฟอนต์สำรอง)');
 
@@ -138,13 +158,91 @@ const lineEvent = (events) => doPost({ postData: { contents: JSON.stringify({ de
     // ── จัดสอนแทน ──
     await page.click('nav.tabbar button[data-tab="plan"]');
     ok((await page.textContent('#dayName')).indexOf('วันจันทร์ที่ 28 กันยายน 2569') >= 0, 'แสดงวันไทย + พ.ศ.');
+
+    // ── เลือกวัน: ปุ่ม วันนี้/พรุ่งนี้ + ลูกศร ──
+    ok(await hasClass('#todayBtn', 'on') && await page.isHidden('#actionBar'), 'เปิดมาอยู่ที่ “วันนี้”; ยังไม่มีรายการ → ไม่แสดงแถบปุ่มล่าง');
+    await page.click('#tomorrowBtn');
+    await idle();
+    ok(await page.evaluate(() => S.date) === '2026-09-29' && await hasClass('#tomorrowBtn', 'on') && (await page.textContent('#dayName')).indexOf('วันอังคาร') >= 0, 'ปุ่ม “พรุ่งนี้” → ไปวันถัดไป');
+    await page.click('#prevDay');
+    await idle();
+    ok(await page.evaluate(() => S.date) === DATE && await hasClass('#todayBtn', 'on'), 'ลูกศร ‹ → กลับมาวันนี้');
+    // เปิดหน้าค้างไว้ข้ามคืน แล้วกลับมาเปิดอีกวัน → ไป "วันนี้" ของวันใหม่ให้เอง (กันจัดลงวันเมื่อวานโดยไม่ตั้งใจ)
+    await setClock('2026-09-29');
+    await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+    await toastHas('ขึ้นวันใหม่แล้ว');
+    ok(await page.evaluate(() => S.date) === '2026-09-29' && await hasClass('#todayBtn', 'on'), 'ข้ามคืน → แสดงรายการของวันใหม่ให้เอง');
+    await setClock(DATE);
+    await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+    await page.waitForFunction((d) => S.date === d, DATE);
+    await idle();
+
+    // ── ปุ่ม/ท่าปัดย้อนกลับของมือถือ: ปิดหน้าต่าง ไม่ออกจากหน้า ──
     await page.click('#addAbsentBtn');
+    await page.waitForSelector('#pickModal.on');
+    await page.goBack();
+    await closed('pickModal');
+    ok(page.url() === PAGE && await page.evaluate(() => S.plan.length) === 0, 'กดย้อนกลับขณะเปิดรายชื่อครู → ปิดหน้าต่าง (ยังอยู่หน้าเดิม)');
+
+    await page.click('#absentList [data-act="addAbsent"]'); // ปุ่มใหญ่ในหน้าว่าง
     await page.click('#pickList button[data-name="ครูสมชาย ใจดี"]');
     const n = await page.$$eval('#absentList .slot', (x) => x.length);
     ok(n > 0, 'เพิ่มครูที่ไม่อยู่ → ดึงคาบจากตารางสอน ' + n + ' คาบ');
+    ok(await page.$('#absentList select[data-f="sub"]') === null && await page.$$eval('#absentList .subpick', (x) => x.length) === n && await page.$$eval('#absentList [data-act="addAbsent"]', (x) => x.length) === 1,
+      'แต่ละคาบมีปุ่มเลือกครูสอนแทน และมีปุ่มเพิ่มครูท้ายรายการ');
+    const small = await smallTargets('#tab-plan, #actionBar, nav.tabbar');
+    ok(small.length === 0, 'หน้าจัดสอนแทน: ที่แตะได้ทุกจุดไม่เล็กกว่า 44px' + (small.length ? ' — ' + small.join(', ') : ''));
+
+    // ── เลือกครูสอนแทนเอง (รายชื่อครูที่ว่าง) ──
+    await page.locator('#absentList .subpick').first().click();
+    await page.waitForSelector('#subModal.on');
+    const sub = await page.evaluate(() => ({
+      ctx: document.querySelector('#subCtx').textContent,
+      free: Array.prototype.map.call(document.querySelectorAll('#subList button[data-name]'), (b) => b.getAttribute('data-name')),
+      first: document.querySelector('#subList button[data-name]').textContent,
+      clearShown: getComputedStyle(document.querySelector('#subFoot')).display !== 'none',
+    }));
+    ok(sub.ctx.indexOf('คาบ ') === 0 && sub.ctx.indexOf('แทนครูสมชาย') > 0 && sub.free.length > 1 && sub.free.indexOf('ครูสมชาย ใจดี') < 0 && sub.first.indexOf('แนะนำ') >= 0 && !sub.clearShown,
+      'แตะคาบ → รายชื่อครูที่ว่างในคาบนั้น (' + sub.free.length + ' คน) คนแรกมีป้าย “แนะนำ”');
+    await page.click('#subList [data-toggle]');
+    const busy = await page.$$eval('#subList button[disabled]', (b) => b.map((x) => x.textContent));
+    ok(busy.some((t) => t.indexOf('ครูสมชาย') >= 0 && t.indexOf('ไม่อยู่วันนี้ (ลาป่วย)') >= 0) && busy.some((t) => t.indexOf('มีสอน ') >= 0), 'ครูที่ไม่ว่างแสดงเหตุผล (ไม่อยู่วันนี้ / มีสอน…) และเลือกไม่ได้');
+    await shot('sub-picker.png');
+    await page.click('#subList button[data-name="' + sub.free[1] + '"]');
+    await closed('subModal');
+    ok(await page.evaluate(() => S.plan[0].slots[0].sub) === sub.free[1] && await hasClass('#absentList .subpick', 'has') && (await page.textContent('#progress')).indexOf('จัดแล้ว 1/' + n) >= 0, 'เลือกครูสอนแทนเอง → คาบนั้นจัดแล้ว (1/' + n + ')');
+    await page.locator('#absentList .subpick').first().click();
+    await page.waitForSelector('#subModal.on');
+    ok(await page.$eval('#subList button.cur', (b) => b.getAttribute('data-name')) === sub.free[1] && await page.isVisible('#subClearBtn'), 'เปิดซ้ำ → เห็นคนที่เลือกไว้ และมีปุ่มยกเลิกผู้สอนแทน');
+    await page.click('#subClearBtn');
+    await closed('subModal');
+    ok(await page.evaluate(() => S.plan[0].slots[0].sub) === '' && (await page.textContent('#progress')).indexOf('จัดแล้ว 0/' + n) >= 0, 'ยกเลิกผู้สอนแทนของคาบได้');
+
+    // ── พิมพ์ในช่องหนึ่งแล้วแตะช่องถัดไป: รายการต้องไม่ถูกสร้างใหม่ (ไม่งั้นช่องหลุดโฟกัส แป้นพิมพ์มือถือปิด) ──
+    await page.click('#absentList [data-act="addSlot"]');
+    await page.fill('#absentList input[data-f="room"]', 'ห้องสมุด');
+    await page.click('#absentList input[data-f="subject"]');
+    await page.keyboard.type('เวรประจำวัน');
+    const typed = await page.evaluate(() => {
+      const s = S.plan[0].slots[S.plan[0].slots.length - 1];
+      return { room: s.room, subject: s.subject, focus: document.activeElement && document.activeElement.getAttribute('data-f') };
+    });
+    ok(typed.room === 'ห้องสมุด' && typed.subject === 'เวรประจำวัน' && typed.focus === 'subject', 'พิมพ์ห้องแล้วแตะช่องวิชาพิมพ์ต่อได้เลย (ช่องไม่หลุดโฟกัส)');
+    await page.click('#absentList [data-act="rmSlot"]');
+
+    // ── กันงานหาย: มีการแก้ไขที่ยังไม่บันทึก แล้วกดย้อนกลับ → ถามก่อนออก ──
+    dialogs.length = 0;
+    dialogMode = 'dismiss';
+    await page.goBack();
+    await page.waitForFunction(() => rearm === true);
+    dialogMode = 'accept';
+    ok(dialogs.length === 1 && dialogs[0].indexOf('confirm: มีการแก้ไขที่ยังไม่บันทึก') === 0 && page.url() === PAGE && await page.evaluate(() => S.dirty && S.plan.length === 1),
+      'งานยังไม่บันทึก + กดย้อนกลับ → ถามก่อนออก; เลือกอยู่ต่อแล้วงานยังอยู่ครบ');
+
     await page.click('#autoBtn');
     ok((await page.textContent('#progress')).indexOf('จัดแล้ว ' + n + '/' + n) >= 0, 'จัดอัตโนมัติครบทุกคาบ');
     ok(await page.$$eval('#absentList .slot.bad', (x) => x.length) === 0, 'ไม่มีคาบที่ชนกัน');
+    ok(await page.evaluate(() => guard && history.state && history.state.guard === 1), 'แตะหน้าจออีกครั้ง → ตั้งตัวกันออกใหม่');
 
     // ── บันทึก + ภาพ (ไม่ต้องใช้ PIN) ──
     await page.click('#saveBtn');
@@ -161,7 +259,22 @@ const lineEvent = (events) => doPost({ postData: { contents: JSON.stringify({ de
 
     ok(await page.$('#sendLineBtn') === null, 'ไม่มีปุ่มส่งเข้ากลุ่ม (ไม่ใช้ push)');
     ok((await page.textContent('#previewModal .sheet-f')).indexOf('แจ้งตารางสอนแทน') >= 0, 'หน้าภาพบอกให้พิมพ์ แจ้งตารางสอนแทน ในกลุ่ม');
-    await page.click('[data-close="previewModal"]');
+    // ไม่ต้องพิมพ์คำสั่งเอง: คัดลอก หรือเปิดไลน์พร้อมข้อความ
+    await page.click('#copyCmdBtn');
+    await toastHas('คัดลอก “แจ้งตารางสอนแทน” แล้ว');
+    ok(await page.evaluate(() => navigator.clipboard.readText()) === 'แจ้งตารางสอนแทน', 'ปุ่มคัดลอกคำสั่ง → คลิปบอร์ดเป็นคำว่า แจ้งตารางสอนแทน');
+    ok(await page.getAttribute('#lineOpenBtn', 'href') === 'https://line.me/R/share?text=' + encodeURIComponent('แจ้งตารางสอนแทน'), 'ปุ่มเปิดไลน์แนบคำสั่งไว้ให้');
+    const smallP = await smallTargets('#previewModal');
+    ok(smallP.length === 0, 'หน้าภาพ: ที่แตะได้ทุกจุดไม่เล็กกว่า 44px' + (smallP.length ? ' — ' + smallP.join(', ') : ''));
+    await page.goBack(); // ย้อนกลับ = ปิดหน้าภาพ
+    await closed('previewModal');
+    ok(page.url() === PAGE && await hasClass('#dayState .pill', 'ok') && (await page.textContent('#saveBtn')).indexOf('ดูภาพ') >= 0, 'กดย้อนกลับ → ปิดหน้าภาพ; สถานะ “บันทึกแล้ว” ปุ่มเปลี่ยนเป็น ดูภาพ / แจ้งไลน์');
+    for (const w of [360, 320]) {
+      await page.setViewportSize({ width: w, height: 640 });
+      ok(await page.evaluate(() => document.documentElement.scrollWidth) === w, 'หน้าจัดสอนแทนไม่มี scroll แนวนอนที่จอ ' + w + 'px');
+    }
+    await shot('plan-320.png');
+    await page.setViewportSize({ width: 390, height: 844 });
 
     // ── หน้าครูไม่มีส่วนตั้งค่า LINE; ลิงก์ไปหน้าผู้ดูแลมีอยู่ ──
     await page.click('nav.tabbar button[data-tab="more"]');
@@ -187,10 +300,13 @@ const lineEvent = (events) => doPost({ postData: { contents: JSON.stringify({ de
     await page.waitForSelector('#loginBox', { state: 'visible' });
     ok(await page.isHidden('#adminBox') && (await page.$eval('#lineBox', (e) => e.innerHTML)) === '', 'ออกจากระบบ → ซ่อนส่วนผู้ดูแลและล้างข้อมูล');
     await page.fill('#loginPw', 'wrongpw');
+    await page.click('#loginBox [data-show]');
+    const pwShown = await page.getAttribute('#loginPw', 'type');
     await page.click('#loginBtn');
     await toastHas('ไม่ถูกต้อง');
     await idle();
     ok(await page.isHidden('#adminBox'), 'รหัสผิด → ไม่ให้เข้า');
+    ok(pwShown === 'text' && await page.getAttribute('#loginPw', 'type') === 'password', 'ปุ่ม “แสดงรหัส” → เห็นรหัสที่พิมพ์ และกลับไปซ่อนเมื่อเปลี่ยนหน้าจอ');
     await page.fill('#loginPw', 'secret1');
     await page.click('#loginBtn');
     await page.waitForSelector('#adminBox', { state: 'visible' });
@@ -219,11 +335,16 @@ const lineEvent = (events) => doPost({ postData: { contents: JSON.stringify({ de
     ok(await page.$eval('#groupSel', (e) => e.value) === 'G1', 'เลือกกลุ่มรับประกาศแล้ว');
     ok(await page.$('select[data-teacher]') === null, 'ไม่มีส่วนผูกชื่อครูกับไลน์');
     ok(await page.$eval('#lineBox input[readonly]', (i) => i.value) === API, 'Webhook URL = URL /exec ที่หน้าเว็บใช้อยู่');
+    await page.click('#lineBox [data-copy="#hookUrl"]');
+    await toastHas('คัดลอกแล้ว');
+    ok(await page.evaluate(() => navigator.clipboard.readText()) === API, 'หน้า admin: ปุ่มคัดลอก Webhook URL');
     ok((await page.$eval('#cfgLine', (i) => i.value)) === "apiUrl: '" + API + "'" && await page.isVisible('#cfgHow'), 'หน้า admin สร้างบรรทัด apiUrl ให้ไปวางใน config.js');
     // ── นำเข้าตารางสอนจาก PDF (อ่านในเบราว์เซอร์ด้วย pdf.js → ตัวอย่าง → บันทึกลงชีต) ──
     if (pdfjsDir) {
       const before = rows_('ตารางสอน').filter((r) => r[0]).length;
-      await page.setInputFiles('#impFile', path.join(ROOT, 'tests/fixtures/timetable-sample.pdf'));
+      // ปุ่ม "เลือกไฟล์ PDF" (label) เปิดตัวเลือกไฟล์ของเครื่อง — ช่องเลือกไฟล์จริงถูกซ่อนไว้
+      const [chooser] = await Promise.all([page.waitForEvent('filechooser'), page.click('label[for="impFile"]')]);
+      await chooser.setFiles(path.join(ROOT, 'tests/fixtures/timetable-sample.pdf'));
       await page.waitForSelector('#impGo', { timeout: 30000 });
       const prev = await page.textContent('#impPreview');
       ok(/ตารางรายครู 2 · ตารางรายชั้น 3 · ข้าม \(ไม่ใช่ตาราง\) 1/.test(prev) && prev.indexOf('7 คาบ') >= 0 && prev.indexOf('2 ครู') >= 0, 'นำเข้า PDF: สรุปจำนวนหน้า/คาบ/ครู');
@@ -234,6 +355,11 @@ const lineEvent = (events) => doPost({ postData: { contents: JSON.stringify({ de
       await page.locator('#impBox').scrollIntoViewIfNeeded();
       await shot('import-preview.png');
       ok(await page.evaluate(() => document.documentElement.scrollWidth) === 390, 'นำเข้า PDF: หน้าตัวอย่างไม่ล้นจอ 390px');
+      const smallA = await smallTargets('.wrap');
+      ok(smallA.length === 0, 'หน้า admin: ที่แตะได้ทุกจุดไม่เล็กกว่า 44px' + (smallA.length ? ' — ' + smallA.join(', ') : ''));
+      await page.setViewportSize({ width: 320, height: 568 });
+      ok(await page.evaluate(() => document.documentElement.scrollWidth) === 320, 'หน้า admin (รวมตัวอย่างนำเข้า) ไม่ล้นจอ 320px');
+      await page.setViewportSize({ width: 390, height: 844 });
       await page.check('#optDeact');
       await page.click('#impGo'); // confirm() ถูกตอบตกลงอัตโนมัติ
       await toastHas('นำเข้าแล้ว');
@@ -287,7 +413,23 @@ const lineEvent = (events) => doPost({ postData: { contents: JSON.stringify({ de
     await page.fill('#statMonth', DATE.slice(0, 7));
     await page.waitForFunction(() => document.querySelectorAll('#statDates .dateitem').length === 1);
     ok(true, 'หน้าสถิติแสดงวันที่จัดสอนแทน');
+    ok((await page.textContent('#monthName')).indexOf('กันยายน 2569') >= 0, 'หน้าสถิติแสดงเดือนเป็นภาษาไทย + พ.ศ.');
     await shot('stats.png');
+    await page.click('#nextMonth');
+    await idle();
+    ok((await page.textContent('#monthName')).indexOf('ตุลาคม 2569') >= 0 && await page.$$eval('#statDates .dateitem', (x) => x.length) === 0, 'ปุ่ม › → เดือนถัดไป');
+    await page.click('#prevMonth');
+    await page.waitForFunction(() => document.querySelectorAll('#statDates .dateitem').length === 1);
+    await idle();
+
+    // ── กันงานหาย (ต่อ): แก้ไขแล้วกดย้อนกลับ ตอบ "ออก" → ออกจากหน้าได้ โดยถามครั้งเดียว ──
+    await page.click('nav.tabbar button[data-tab="plan"]');
+    await page.selectOption('#absentList select[data-f="reason"]', 'ลากิจ');
+    ok(await page.evaluate(() => S.dirty && guard) && await hasClass('#dayState .pill', 'no'), 'แก้เหตุผลการลา → สถานะ “ยังไม่บันทึก”');
+    dialogs.length = 0;
+    await page.goBack();
+    await page.waitForURL(/admin\.html$/);
+    ok(dialogs.length === 1 && dialogs[0].indexOf('confirm: มีการแก้ไขที่ยังไม่บันทึก') === 0, 'กดย้อนกลับแล้วตอบออก → ออกจากหน้า (ถามครั้งเดียว ไม่มีกล่องถามซ้ำ)');
 
     ok(!log.api.some((c) => c.method === 'GET' && c.fn === 'getAdminData'), 'ฟังก์ชันผู้ดูแลไม่ถูกเรียกผ่าน GET');
     ok(!__lineCalls.some((c) => /message\/(push|multicast|broadcast)/.test(c.path)), 'ไม่มีการ push เลย');
