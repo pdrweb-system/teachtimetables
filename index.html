@@ -30,7 +30,7 @@
   button, input, select { font: inherit; color: inherit; }
   .wrap { max-width: 640px; margin: 0 auto; padding: 0 12px calc(176px + var(--safe-b)); }
 
-  header.top { background: linear-gradient(90deg, var(--pri), var(--pri2)); color: #fff; padding: calc(12px + env(safe-area-inset-top, 0px)) 16px 14px; }
+  header.top { background: linear-gradient(90deg, var(--pri), var(--pri2)); color: #fff; padding: 12px 16px 14px; padding: calc(12px + env(safe-area-inset-top, 0px)) 16px 14px; }
   header.top .in { max-width: 640px; margin: 0 auto; }
   header.top h1 { margin: 0; font-size: 21px; font-weight: 700; }
   header.top .school { opacity: .85; font-size: 14px; }
@@ -96,7 +96,7 @@
   .aname { font-weight: 700; font-size: 17px; }
   .ok-t { color: var(--ok); font-weight: 600; }
   .warn-t { color: var(--warn); font-weight: 600; }
-  .grid2 { display: grid; grid-template-columns: 1fr 1.3fr; gap: 8px; margin-top: 10px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1.3fr; grid-gap: 8px; gap: 8px; margin-top: 10px; }
   .slot { border-radius: 12px; padding: 10px; margin-top: 10px; background: var(--warnbg); border-left: 4px solid #f59e0b; }
   .slot.ok { background: var(--okbg); border-left-color: var(--ok); }
   .slot.bad { background: var(--errbg); border-left-color: var(--err); }
@@ -105,7 +105,7 @@
   .slot-info { flex: 1; min-width: 0; font-size: 15.5px; font-weight: 600; overflow-wrap: anywhere; }
   .ptime { flex: none; color: var(--muted); font-size: 13.5px; white-space: nowrap; padding-top: 1px; }
   .slot-h .icon-btn { margin: -4px -2px -4px 0; }
-  .custom-grid { display: grid; grid-template-columns: 90px 1fr 1fr; gap: 6px; margin-bottom: 8px; }
+  .custom-grid { display: grid; grid-template-columns: 90px 1fr 1fr; grid-gap: 6px; gap: 6px; margin-bottom: 8px; }
   /* ช่องเลือกครูสอนแทน: แตะแล้วเปิดรายชื่อครูที่ว่าง (แทน select ของเครื่องที่ข้อความยาวจนอ่านไม่ออก) */
   .subpick { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 48px; padding: 6px 12px; text-align: left;
     border: 1.5px dashed #e0a43a; border-radius: 10px; background: #fff; cursor: pointer; }
@@ -145,7 +145,7 @@
   .sheet-h h3 { margin: 0; font-size: 18px; }
   .sheet-s { flex: none; padding: 0 16px 8px; }
   .sheet-b { padding: 0 16px 12px; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
-  .sheet-f { flex: none; padding: 10px 16px 14px; border-top: 1px solid var(--line); display: grid; gap: 8px; }
+  .sheet-f { flex: none; padding: 10px 16px 14px; border-top: 1px solid var(--line); display: grid; grid-gap: 8px; gap: 8px; }
   .sheet-f .row .btn { white-space: nowrap; padding: 0 10px; }
   .plist button { width: 100%; min-height: 56px; text-align: left; border: 0; border-bottom: 1px solid var(--line); background: none; padding: 10px 4px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
   .plist button:disabled { opacity: .55; cursor: default; }
@@ -163,7 +163,7 @@
   .num { font-weight: 700; font-size: 18px; min-width: 36px; text-align: right; }
   .dateitem { width: 100%; min-height: 56px; text-align: left; border: 0; background: #f6f8fb; border-radius: 10px; padding: 10px 12px; margin-top: 8px; cursor: pointer; }
 
-  .kv { display: grid; grid-template-columns: 110px 1fr; gap: 6px 10px; font-size: 15px; }
+  .kv { display: grid; grid-template-columns: 110px 1fr; grid-gap: 6px 10px; gap: 6px 10px; font-size: 15px; }
   .pill { display: inline-block; border-radius: 999px; padding: 1px 10px; font-size: 13px; font-weight: 600; white-space: nowrap; }
   .pill.ok { background: var(--okbg); color: var(--ok); }
   .pill.no { background: var(--errbg); color: var(--err); }
@@ -175,7 +175,7 @@
   ol.steps li { margin-bottom: 6px; }
 
   /* ข้อความแจ้งผล: อยู่ด้านบนจอ ไม่บังปุ่ม/หน้าต่างด้านล่าง */
-  #toast { position: fixed; left: 50%; transform: translateX(-50%); top: calc(10px + env(safe-area-inset-top, 0px)); background: #1c2533; color: #fff; padding: 10px 16px; border-radius: 12px; z-index: 80; width: max-content; max-width: 92vw; text-align: center; opacity: 0; pointer-events: none; transition: opacity .2s; font-size: 15px; box-shadow: 0 4px 14px rgba(0,0,0,.25); }
+  #toast { position: fixed; left: 50%; transform: translateX(-50%); top: 10px; top: calc(10px + env(safe-area-inset-top, 0px)); background: #1c2533; color: #fff; padding: 10px 16px; border-radius: 12px; z-index: 80; width: max-content; max-width: 92vw; text-align: center; opacity: 0; pointer-events: none; transition: opacity .2s; font-size: 15px; box-shadow: 0 4px 14px rgba(0,0,0,.25); }
   #toast.on { opacity: 1; }
   #toast.err { background: var(--err); }
   #loading { position: fixed; top: 0; right: 0; bottom: 0; left: 0; background: rgba(255,255,255,.7); z-index: 90; display: none; align-items: center; justify-content: center; flex-direction: column; }
