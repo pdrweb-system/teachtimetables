@@ -555,12 +555,12 @@ function buildFlexMessage_(dd) {
 
   // ตารางแบบเดียวกับภาพตารางสอนแทน: คาบ | เวลา | ห้อง | วิชา | ครูที่ไม่อยู่ | ครูสอนแทน (แถวที่ยังไม่มีคนแทนเป็นสีแดง)
   const COLS = [
-    { t: 'คาบ', flex: 2, align: 'center', get: function (s) { return String(s.period || '-'); } },
-    { t: 'เวลา', flex: 3, align: 'center', size: 'xxs', get: function (s) { const p = pmap[s.period]; return p ? p.start + '–' + p.end : '-'; } },
-    { t: 'ห้อง', flex: 2, align: 'center', get: function (s) { return s.room || '-'; } },
-    { t: 'วิชา', flex: 4, get: function (s) { return s.subject || '-'; } },
-    { t: 'ครูที่ไม่อยู่', flex: 4, get: function (s) { return disp(s.absent); } },
-    { t: 'ครูสอนแทน', flex: 4, sub: true, get: function (s) { return s.sub ? disp(s.sub) : 'ยังไม่มีผู้สอนแทน'; } },
+    { t: 'คาบ', flex: 4, align: 'center', get: function (s) { return String(s.period || '-'); } },
+    { t: 'เวลา', flex: 6, align: 'center', get: function (s) { const p = pmap[s.period]; return p ? p.start + '–' + p.end : '-'; } },
+    { t: 'ห้อง', flex: 5, align: 'center', get: function (s) { return s.room || '-'; } },
+    { t: 'วิชา', flex: 8, get: function (s) { return s.subject || '-'; } },
+    { t: 'ครูที่ไม่อยู่', flex: 8, get: function (s) { return disp(s.absent); } },
+    { t: 'ครูสอนแทน', flex: 8, sub: true, get: function (s) { return s.sub ? disp(s.sub) : 'ยังไม่มีผู้สอนแทน'; } },
   ];
   // เส้นตารางทุกช่อง: แต่ละช่องเป็นกล่องของตัวเอง (padding อยู่ในช่อง) คั่นด้วย separator แนวตั้งที่สูงเต็มแถว
   // และมี separator แนวนอนคั่นทุกแถว (ผู้ใช้สั่ง 2026-11-15 หลังดูการ์ดในไลน์จริง)
@@ -569,21 +569,21 @@ function buildFlexMessage_(dd) {
     const out = [];
     COLS.forEach(function (c, i) {
       if (i) out.push({ type: 'separator', color: GRID });
-      out.push({ type: 'box', layout: 'vertical', flex: c.flex, paddingAll: '4px', justifyContent: 'center', contents: [fn(c)] });
+      out.push({ type: 'box', layout: 'vertical', flex: c.flex, paddingAll: '3px', justifyContent: 'center', contents: [fn(c)] });
     });
     return out;
   };
   const headRow = {
     type: 'box', layout: 'horizontal', backgroundColor: '#e8eef7',
     // คอลัมน์ "คาบ" เดิม flex 1 แคบจนในไลน์จริงถูกตัดเป็น "คา/บ" → ขยายเป็น flex 2 (ไม่ใช้ wrap:false เพราะถ้าไม่พอ LINE จะตัดเป็น "…" ซึ่งแย่กว่า)
-    contents: cells(function (c) { return txt(c.t, { size: 'xs', weight: 'bold', color: C.head, align: c.align || 'start' }); }),
+    contents: cells(function (c) { return txt(c.t, { size: 'xxs', weight: 'bold', color: C.head, align: c.align || 'start' }); }),
   };
   const row = function (s, i) {
     return {
       type: 'box', layout: 'horizontal',
       backgroundColor: s.sub ? (i % 2 ? '#f7f9fc' : '#ffffff') : '#fdecec',
       contents: cells(function (c) {
-        const o = { size: c.size || 'xs', align: c.align || 'start', color: C.ink };
+        const o = { size: 'xxs', align: c.align || 'start', color: C.ink };
         if (c.sub) { o.weight = 'bold'; o.color = s.sub ? C.ok : C.err; }
         return txt(c.get(s), o);
       }),
@@ -597,14 +597,14 @@ function buildFlexMessage_(dd) {
 
   const bubble = function (rows, part, total, first, last, hidden) {
     const header = {
-      type: 'box', layout: 'vertical', spacing: 'xs', paddingAll: '16px',
+      type: 'box', layout: 'vertical', spacing: 'xs', paddingAll: '12px',
       background: { type: 'linearGradient', angle: '90deg', startColor: C.pri, endColor: C.pri2 },
       contents: [
         st[SET.SCHOOL] ? txt(st[SET.SCHOOL], { size: 'sm', weight: 'bold', color: '#ffffff' }) : null,
         {
           type: 'box', layout: 'horizontal', alignItems: 'center',
           contents: [
-            txt('ตารางสอนแทน' + (total > 1 ? ' (' + part + '/' + total + ')' : ''), { size: 'xxl', weight: 'bold', color: '#ffffff', flex: 1 }),
+            txt('ตารางสอนแทน' + (total > 1 ? ' (' + part + '/' + total + ')' : ''), { size: 'xl', weight: 'bold', color: '#ffffff', flex: 1 }),
             {
               type: 'box', layout: 'vertical', flex: 0, cornerRadius: '14px', backgroundColor: '#ffffff33',
               paddingStart: '10px', paddingEnd: '10px', paddingTop: '2px', paddingBottom: '2px',
@@ -629,8 +629,10 @@ function buildFlexMessage_(dd) {
     if (last && hidden) body.push(txt('…และอีก ' + hidden + ' คาบ (ดูครบในภาพตาราง)', { size: 'sm', color: C.err }));
 
     const b = {
-      type: 'bubble', size: 'giga', header: header,
-      body: { type: 'box', layout: 'vertical', spacing: 'md', paddingAll: '10px', contents: body },
+      // ขนาด mega (กว้าง 300px) — giga (500px) กว้างเกินจอมือถือ: ในไลน์จริงคอลัมน์ขวาสุดตกขอบจอ (ภาพจากผู้ใช้ 2026-11-15)
+      // ตัวหนังสือในตารางจึงใช้ xxs ทั้งหมด และสัดส่วนคอลัมน์ 4:6:5:8:8:8 ให้ 6 คอลัมน์พอดี 300px
+      type: 'bubble', size: 'mega', header: header,
+      body: { type: 'box', layout: 'vertical', spacing: 'md', paddingAll: '8px', contents: body },
     };
     if (last) {
       const foot = [];
