@@ -256,40 +256,6 @@
       <div id="statDates" class="muted small">—</div>
     </div>
   </section>
-
-  <!-- ───────── แท็บเพิ่มเติม ───────── -->
-  <section class="tab" id="tab-more">
-    <div class="card" id="apiCard">
-      <div class="card-h"><h2>การเชื่อมต่อ API</h2></div>
-      <div class="muted small" id="apiHint">URL ของ Apps Script (Web app) ที่หน้าเว็บนี้เรียกใช้เป็นฐานข้อมูล — ขอจากผู้ดูแลระบบ</div>
-      <div class="row" style="margin-top:10px">
-        <input type="text" id="apiUrlInput" class="grow" placeholder="https://script.google.com/macros/s/xxxx/exec" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url">
-        <button class="btn sm pri" id="apiUrlSaveBtn" type="button">บันทึก</button>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="card-h"><h2>วิธีใช้</h2></div>
-      <ol class="steps">
-        <li>เลือกวัน แล้วกด <b>+ เพิ่มครู</b> ที่ไม่อยู่</li>
-        <li>กด <b>⚡ จัดอัตโนมัติ</b> หรือแตะเลือกครูสอนแทนเองทีละคาบ แล้วกด <b>💾 บันทึก</b></li>
-        <li>ส่งคำว่า <code class="cmd">แจ้งตารางสอนแทน</code> ในกลุ่มไลน์ บอทจะตอบเป็นการ์ดตารางสอนแทนของวันนี้</li>
-      </ol>
-      <button class="btn ghost block" id="copyCmdBtn2" type="button">📋 คัดลอกคำว่า “แจ้งตารางสอนแทน”</button>
-    </div>
-
-    <div class="card">
-      <div class="card-h"><h2>ข้อมูลครูและตารางสอน</h2></div>
-      <div class="muted small">ถ้าผู้ดูแลแก้รายชื่อครูหรือตารางสอน กดปุ่มนี้เพื่อดึงข้อมูลล่าสุด</div>
-      <button class="btn line block" id="reloadBtn" type="button" style="margin-top:10px">โหลดข้อมูลครู/ตารางสอนใหม่</button>
-    </div>
-
-    <div class="card">
-      <div class="card-h"><h2>สำหรับผู้ดูแลระบบ</h2></div>
-      <div class="muted small">ตั้งค่า LINE, นำเข้าตารางสอนจาก PDF, แก้ข้อมูลครู — ต้องใส่รหัสผู้ดูแล</div>
-      <a class="btn line block" id="adminLink" href="admin.html" style="margin-top:10px">🔒 เข้าหน้าผู้ดูแลระบบ</a>
-    </div>
-  </section>
 </div>
 
 <!-- แถบปุ่มล่าง (แท็บจัดสอนแทน) -->
@@ -307,7 +273,6 @@
 <nav class="tabbar"><div class="in">
   <button class="on" data-tab="plan" type="button"><span class="ic">🗓️</span>จัดสอนแทน</button>
   <button data-tab="stats" type="button"><span class="ic">📊</span>สถิติ</button>
-  <button data-tab="more" type="button"><span class="ic">☰</span>เพิ่มเติม</button>
 </div></nav>
 
 <!-- เลือกครูที่ไม่อยู่ -->
@@ -371,7 +336,7 @@
 })();
 
 /* ═══════════════ ตั้งค่าการเชื่อมต่อ API ═══════════════ */
-// URL ของ Apps Script (/exec): ใส่ครั้งเดียวใน config.js (ใช้ทุกเครื่อง) — ถ้าเว้นว่างไว้ ใช้ค่าที่กรอกในเครื่องนั้น (localStorage)
+// URL ของ Apps Script (/exec): ใส่ครั้งเดียวใน config.js (ใช้ทุกเครื่อง) — ถ้าเว้นว่างไว้ ใช้ค่าที่กรอกไว้ในเครื่องนั้นจากหน้าผู้ดูแล (localStorage)
 function cfgUrl() { return (window.APP_CONFIG && window.APP_CONFIG.apiUrl || '').trim(); }
 function apiUrl() {
   return cfgUrl() || load('apiUrl');
@@ -392,7 +357,7 @@ var GET_FUNCTIONS = { getInitData: 1, getDateData: 1, getStats: 1 };
 function run(fn) {
   var args = Array.prototype.slice.call(arguments, 1);
   var base = apiUrl();
-  if (!base) return Promise.reject(new Error('ยังไม่ได้ตั้งค่า URL ของ Apps Script — ไปที่แท็บ “เพิ่มเติม” เพื่อกรอก'));
+  if (!base) return Promise.reject(new Error('ยังไม่ได้ตั้งค่า URL ของ Apps Script — ให้ผู้ดูแลตั้งค่าที่หน้าผู้ดูแล'));
 
   if (GET_FUNCTIONS[fn]) {
     var url = base + '?fn=' + encodeURIComponent(fn) + '&args=' + encodeURIComponent(JSON.stringify(args));
@@ -409,7 +374,7 @@ function run(fn) {
 // fetch ล้มเหลวทั้งก้อน (เบราว์เซอร์แจ้งแค่ "Failed to fetch") — มักเกิดจากเน็ตหลุด, URL ผิด/เป็น /dev,
 // หรือ Deploy โดยไม่ได้ตั้งผู้มีสิทธิ์เข้าถึงเป็น "ทุกคน" (Google จะพาไปหน้า login ซึ่งเรียกข้ามโดเมนไม่ได้)
 function netFail() {
-  throw new Error('เชื่อมต่อ Apps Script ไม่ได้ — ตรวจสอบอินเทอร์เน็ต และ URL ในแท็บ “เพิ่มเติม” (ต้องลงท้ายด้วย /exec และ Deploy โดยให้ “ทุกคน” เข้าถึงได้)');
+  throw new Error('เชื่อมต่อ Apps Script ไม่ได้ — ตรวจสอบอินเทอร์เน็ต แล้วลองเปิดหน้านี้ใหม่ (ผู้ดูแล: URL ต้องลงท้ายด้วย /exec และ Deploy โดยให้ “ทุกคน” เข้าถึงได้)');
 }
 
 function readJson(res) {
@@ -558,36 +523,14 @@ function copyCmd() {
   });
 }
 $('#copyCmdBtn').onclick = copyCmd;
-$('#copyCmdBtn2').onclick = copyCmd;
 $('#lineOpenBtn').href = 'https://line.me/R/share?text=' + encodeURIComponent(LINE_CMD);
-
-/* ═══════════════ ตั้งค่า URL ของ API ═══════════════ */
-$('#apiUrlSaveBtn').onclick = function () {
-  var v = $('#apiUrlInput').value.trim();
-  if (v && !/^https:\/\/script\.google\.com\/macros\/s\/.+\/exec$/.test(v)) {
-    if (!confirm('URL นี้ไม่เหมือนรูปแบบปกติของ Apps Script Web app (…/exec) ต้องการบันทึกต่อหรือไม่?')) return;
-  }
-  store('apiUrl', v);
-  toast('บันทึก URL แล้ว ✓ กำลังโหลดข้อมูลใหม่…');
-  boot().then(function (ok) {
-    if (ok) toast('เชื่อมต่อสำเร็จ ✓ ' + (S.init.school || ''));
-  });
-};
 
 /* ═══════════════ เริ่มต้น ═══════════════ */
 // คืนค่า Promise<boolean> — true เมื่อโหลดข้อมูลจาก API ได้
 function boot() {
-  $('#apiUrlInput').value = apiUrl();
-  if (cfgUrl()) { // ตั้งไว้กลางใน config.js แล้ว → ไม่ต้องกรอก/แก้ในเครื่อง
-    $('#apiUrlInput').readOnly = true;
-    $('#apiUrlSaveBtn').style.display = 'none';
-    $('#apiHint').textContent = 'URL นี้ตั้งไว้กลางในระบบแล้ว (config.js) ไม่ต้องกรอกในเครื่องนี้';
-    $('#tab-more').appendChild($('#apiCard')); // ครูไม่ต้องใช้การ์ดนี้ → ย้ายไปไว้ล่างสุด
-  }
-  if (!apiUrl()) {
-    $('#absentList').innerHTML = '<div class="empty">ยังไม่ได้ตั้งค่า URL ของ Apps Script<br>ไปที่แท็บ “เพิ่มเติม” ด้านล่างเพื่อกรอก URL ก่อนใช้งาน</div>';
-    showTab('more');
-    toast('กรุณาตั้งค่า URL ของ Apps Script ก่อน', true);
+  if (!apiUrl()) { // หน้าครูไม่มีช่องกรอก URL: ตั้งใน config.js (ทุกเครื่อง) หรือที่หน้าผู้ดูแล (เฉพาะเครื่องนี้)
+    $('#absentList').innerHTML = '<div class="empty">ยังไม่ได้เชื่อมต่อฐานข้อมูล<br>ให้ผู้ดูแลระบบตั้งค่า URL ของ Apps Script ก่อนใช้งาน' +
+      '<a class="btn line block" href="admin.html" style="margin-top:14px">🔒 ไปหน้าผู้ดูแลระบบ</a></div>';
     return Promise.resolve(false);
   }
   loading(true, 'กำลังโหลดข้อมูล…');
@@ -1016,12 +959,6 @@ $('#saveBtn').onclick = function () {
 };
 
 window.addEventListener('beforeunload', function (e) { if (S.dirty && !leaving) { e.preventDefault(); e.returnValue = ''; } });
-// ลิงก์ออกไปหน้าอื่น (หน้าผู้ดูแล): ถามเองก่อน เพราะ iPhone ไม่มี beforeunload
-$('#adminLink').addEventListener('click', function (e) {
-  if (!S.dirty) return;
-  if (!confirm(LEAVE_MSG)) { e.preventDefault(); return; }
-  leaveSoon();
-});
 
 /* ═══════════════ สร้างภาพ ═══════════════ */
 function segs(text) {
@@ -1271,15 +1208,6 @@ $('#statDates').addEventListener('click', function (e) {
   $('#date').value = b.getAttribute('data-date');
   loadDate(b.getAttribute('data-date'));
 });
-
-/* ═══════════════ เพิ่มเติม ═══════════════ */
-$('#reloadBtn').onclick = function () {
-  if (S.dirty && !confirm('มีการแก้ไขที่ยังไม่บันทึก — โหลดข้อมูลใหม่แล้วการแก้ไขนี้จะหายไป ต้องการโหลดหรือไม่?')) return;
-  loading(true);
-  run('getInitData').then(function (init) { applyInit(init); return loadDate(S.date || init.today, true); })
-    .then(function () { toast('โหลดข้อมูลใหม่แล้ว ✓'); })
-    .catch(function (e) { toast(errMsg(e), true); }).then(function () { loading(false); });
-};
 
 boot();
 </script>

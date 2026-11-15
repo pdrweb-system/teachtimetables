@@ -140,20 +140,32 @@ const lineEvent = (events) => doPost({ postData: { contents: JSON.stringify({ de
   try {
     // ── ตั้งค่า URL ของ API ──
     await page.goto(PAGE);
-    ok(await page.$eval('#tab-more', (e) => e.classList.contains('on')), 'ยังไม่ตั้ง URL → เปิดแท็บเพิ่มเติมให้');
+    ok(await page.$('nav.tabbar button[data-tab="more"]') === null && await page.$('#apiUrlInput') === null && await page.$$eval('nav.tabbar button', (x) => x.length) === 2,
+      'หน้าครูไม่มีเมนู “เพิ่มเติม” (มีแค่ จัดสอนแทน / สถิติ)');
+    ok((await page.textContent('#absentList')).indexOf('ยังไม่ได้เชื่อมต่อฐานข้อมูล') >= 0, 'ยังไม่ตั้ง URL → บอกให้ผู้ดูแลตั้งค่า พร้อมลิงก์ไปหน้าผู้ดูแล');
+    await page.click('#absentList a[href="admin.html"]');
+    await page.waitForSelector('#urlBox', { state: 'visible' });
 
     await page.fill('#apiUrlInput', DEAD);
     await page.click('#apiUrlSaveBtn');
     await toastHas('เชื่อมต่อ Apps Script ไม่ได้');
     await idle();
+    await page.goto(PAGE);
+    await toastHas('เชื่อมต่อ Apps Script ไม่ได้');
+    await idle();
     ok(true, 'URL ที่เชื่อมต่อไม่ได้ → แจ้งเป็นภาษาไทยพร้อมวิธีตรวจ (ไม่ใช่ "Failed to fetch")');
-    log.errors.length = 0; // error ของคำขอที่ตั้งใจให้ล้ม
 
+    await page.goto(PAGE + 'admin.html');
+    await page.waitForSelector('#urlBox', { state: 'visible' });
+    await idle();
+    log.errors.length = 0; // error ของคำขอที่ตั้งใจให้ล้ม
     await page.fill('#apiUrlInput', API);
     await page.click('#apiUrlSaveBtn');
-    await toastHas('เชื่อมต่อสำเร็จ ✓ โรงเรียนตัวอย่าง');
+    await page.waitForSelector('#setupBox', { state: 'visible' });
+    await page.goto(PAGE);
+    await page.waitForFunction(() => document.querySelector('#schoolName').textContent.trim() === 'โรงเรียนตัวอย่าง');
     await idle();
-    ok(true, 'URL ถูกต้อง → โหลดข้อมูลผ่าน GET + 302 และแจ้งเชื่อมต่อสำเร็จ');
+    ok(true, 'ตั้ง URL ที่หน้าผู้ดูแล → หน้าครูโหลดข้อมูลผ่าน GET + 302 ได้');
 
     // ── จัดสอนแทน ──
     await page.click('nav.tabbar button[data-tab="plan"]');
@@ -276,10 +288,9 @@ const lineEvent = (events) => doPost({ postData: { contents: JSON.stringify({ de
     await shot('plan-320.png');
     await page.setViewportSize({ width: 390, height: 844 });
 
-    // ── หน้าครูไม่มีส่วนตั้งค่า LINE; ลิงก์ไปหน้าผู้ดูแลมีอยู่ ──
-    await page.click('nav.tabbar button[data-tab="more"]');
+    // ── หน้าครูไม่มีส่วนตั้งค่าใด ๆ ──
     ok(await page.$('#lineBox') === null && await page.$('#tokenInput') === null, 'หน้าครูไม่มีฟอร์มตั้งค่า LINE');
-    ok(await page.getAttribute('a[href="admin.html"]', 'href') === 'admin.html', 'มีลิงก์ไปหน้าผู้ดูแล');
+    ok(await page.$('a[href="admin.html"]') === null, 'เชื่อมต่อแล้ว → หน้าครูไม่มีลิงก์/เมนูของผู้ดูแล');
 
     // ── หน้าผู้ดูแล: ต้องตั้ง/ใส่รหัสก่อน ──
     await page.goto(PAGE + 'admin.html');
@@ -440,8 +451,6 @@ const lineEvent = (events) => doPost({ postData: { contents: JSON.stringify({ de
     await page.waitForFunction(() => document.querySelector('#schoolName').textContent.trim() === 'โรงเรียนตัวอย่าง');
     await idle();
     ok(await page.evaluate(() => localStorage.getItem('apiUrl') === null), 'config.js: โหลดข้อมูลได้โดยไม่ต้องกรอก URL (localStorage ว่าง)');
-    await page.click('nav.tabbar button[data-tab="more"]');
-    ok(await page.$eval('#apiUrlInput', (i) => i.readOnly && i.value) === API && await page.isHidden('#apiUrlSaveBtn'), 'config.js: ช่อง URL ถูกล็อก ไม่มีปุ่มบันทึก');
     await page.goto(PAGE + 'admin.html');
     await page.waitForSelector('#loginBox', { state: 'visible' });
     ok(await page.isHidden('#urlBox'), 'config.js: หน้า admin ไม่ขอ URL');
