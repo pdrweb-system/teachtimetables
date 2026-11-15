@@ -542,25 +542,32 @@ function buildFlexMessage_(dd) {
   periods_().forEach(function (p) { pmap[p.p] = p; });
   const disp = function (n) { return (tmap[n] && tmap[n].display) || n; };
   const txt = function (text, opt) { return Object.assign({ type: 'text', text: String(text), wrap: true }, opt || {}); };
-  const slots = dd.subs.filter(function (s) { return s.period || s.subject; })
-    .sort(function (a, b) { return (a.period || 99) - (b.period || 99); });
-
+  // ครูที่ไม่อยู่ (เรียงตามที่บันทึก) + ป้ายชื่อพร้อมเหตุผล
   const absents = [];
-  const seen = {};
+  const absentLabel = {};
+  const absentOrder = {};
   dd.subs.forEach(function (s) {
-    if (seen[s.absent]) return;
-    seen[s.absent] = true;
-    absents.push(disp(s.absent) + (s.reason ? ' (' + s.reason + ')' : '') + (s.note ? ' — ' + s.note : ''));
+    if (absentLabel[s.absent]) return;
+    absentLabel[s.absent] = disp(s.absent) + (s.reason ? ' (' + s.reason + ')' : '');
+    absentOrder[s.absent] = absents.length;
+    absents.push(absentLabel[s.absent] + (s.note ? ' — ' + s.note : ''));
   });
+  // ไม่อยู่หลายคน → จัดกลุ่มตามครูที่ไม่อยู่ (มีแถวหัวกลุ่มเป็นชื่อครู) แล้วเรียงตามคาบ; คนเดียว → เรียงตามคาบ
+  const multi = absents.length > 1;
+  const slots = dd.subs.filter(function (s) { return s.period || s.subject; })
+    .sort(function (a, b) {
+      return (multi ? absentOrder[a.absent] - absentOrder[b.absent] : 0) || ((a.period || 99) - (b.period || 99));
+    });
 
-  // ตารางแบบเดียวกับภาพตารางสอนแทน: คาบ | เวลา | ห้อง | วิชา | ครูที่ไม่อยู่ | ครูสอนแทน (แถวที่ยังไม่มีคนแทนเป็นสีแดง)
+  // ตาราง 5 คอลัมน์: คาบ | เวลา | ห้อง | วิชา | ครูสอนแทน — ทุกช่องต้องอยู่บรรทัดเดียวในการ์ดกว้าง 300px (ผู้ใช้สั่ง 2026-11-15)
+  // จึงไม่มีคอลัมน์ "ครูที่ไม่อยู่" (6 คอลัมน์ไม่พอที่ ข้อความถูกตัดเป็นสองบรรทัด): ชื่อครูที่ไม่อยู่อยู่บรรทัดเหนือตาราง และแถวหัวกลุ่ม
+  // สัดส่วนคอลัมน์วัดจากภาพหน้าจอไลน์จริง (xxs): "08:30–09:30" ≈ 66px, "ภาษาอังกฤษ" ≈ 58px, "ครูเบญจรงค์" ≈ 62px
   const COLS = [
-    { t: 'คาบ', flex: 4, align: 'center', get: function (s) { return String(s.period || '-'); } },
-    { t: 'เวลา', flex: 6, align: 'center', get: function (s) { const p = pmap[s.period]; return p ? p.start + '–' + p.end : '-'; } },
-    { t: 'ห้อง', flex: 5, align: 'center', get: function (s) { return s.room || '-'; } },
-    { t: 'วิชา', flex: 8, get: function (s) { return s.subject || '-'; } },
-    { t: 'ครูที่ไม่อยู่', flex: 8, get: function (s) { return disp(s.absent); } },
-    { t: 'ครูสอนแทน', flex: 8, sub: true, get: function (s) { return s.sub ? disp(s.sub) : 'ยังไม่มีผู้สอนแทน'; } },
+    { t: 'คาบ', flex: 14, align: 'center', get: function (s) { return String(s.period || '-'); } },
+    { t: 'เวลา', flex: 39, align: 'center', get: function (s) { const p = pmap[s.period]; return p ? p.start + '–' + p.end : '-'; } },
+    { t: 'ห้อง', flex: 16, align: 'center', get: function (s) { return s.room || '-'; } },
+    { t: 'วิชา', flex: 34, get: function (s) { return s.subject || '-'; } },
+    { t: 'ครูสอนแทน', flex: 37, sub: true, get: function (s) { return s.sub ? disp(s.sub) : 'ยังไม่มี'; } },
   ];
   // เส้นตารางทุกช่อง: แต่ละช่องเป็นกล่องของตัวเอง (padding อยู่ในช่อง) คั่นด้วย separator แนวตั้งที่สูงเต็มแถว
   // และมี separator แนวนอนคั่นทุกแถว (ผู้ใช้สั่ง 2026-11-15 หลังดูการ์ดในไลน์จริง)
@@ -575,7 +582,7 @@ function buildFlexMessage_(dd) {
   };
   const headRow = {
     type: 'box', layout: 'horizontal', backgroundColor: '#e8eef7',
-    // คอลัมน์ "คาบ" เดิม flex 1 แคบจนในไลน์จริงถูกตัดเป็น "คา/บ" → ขยายเป็น flex 2 (ไม่ใช้ wrap:false เพราะถ้าไม่พอ LINE จะตัดเป็น "…" ซึ่งแย่กว่า)
+    // ไม่ใช้ wrap:false: ถ้าข้อความยาวเกินช่องจริง ๆ ให้ขึ้นบรรทัดใหม่ ดีกว่าถูก LINE ตัดเป็น "…"
     contents: cells(function (c) { return txt(c.t, { size: 'xxs', weight: 'bold', color: C.head, align: c.align || 'start' }); }),
   };
   const row = function (s, i) {
@@ -589,9 +596,20 @@ function buildFlexMessage_(dd) {
       }),
     };
   };
+  const groupRow = function (name) { // แถวหัวกลุ่ม: ชื่อครูที่ไม่อยู่ (เฉพาะเมื่อไม่อยู่หลายคน)
+    return {
+      type: 'box', layout: 'vertical', backgroundColor: '#f1f4f9', paddingAll: '3px', paddingStart: '6px',
+      contents: [txt('แทน' + absentLabel[name], { size: 'xxs', weight: 'bold', color: C.head })],
+    };
+  };
   const grid = function (rows) { // หัวตาราง + แถว โดยมีเส้นคั่นทุกแถว
     const out = [headRow];
-    rows.forEach(function (s, i) { out.push({ type: 'separator', color: GRID }); out.push(row(s, i)); });
+    let cur = null, k = 0;
+    rows.forEach(function (s) {
+      if (multi && s.absent !== cur) { cur = s.absent; k = 0; out.push({ type: 'separator', color: GRID }); out.push(groupRow(cur)); }
+      out.push({ type: 'separator', color: GRID });
+      out.push(row(s, k++));
+    });
     return out;
   };
 

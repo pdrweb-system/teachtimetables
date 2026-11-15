@@ -147,7 +147,7 @@ ok(flex.contents.type === 'bubble', 'คาบไม่เยอะ → bubble �
 const slotsCount = rows.filter((r) => r.period).length;
 ok(allText(flex.contents.header).indexOf(slotsCount + ' คาบ') >= 0 && allText(flex.contents.header).indexOf('วันจันทร์ที่ 28 กันยายน 2569') >= 0, 'หัวการ์ดมีวันที่และจำนวนคาบ');
 ok(subNames.every((n) => allText(flex).indexOf(disp(n)) >= 0), 'แสดงชื่อผู้สอนแทนครบ');
-ok(allText(flex).indexOf('ยังไม่มีผู้สอนแทน') >= 0, 'คาบที่ยังไม่มีคนแทนแสดงเป็นสีแดง');
+ok(allText(flex).indexOf('"ยังไม่มี"') >= 0, 'คาบที่ยังไม่มีคนแทนแสดงเป็นสีแดง');
 ok(allText(flex).indexOf('ครูนภา (ไปราชการ) — อบรม {ออนไลน์}') >= 0, 'แสดงครูที่ไม่อยู่ + เหตุผล + หมายเหตุ (Flex ไม่ต้อง escape ปีกกา)');
 ok(flex.altText.indexOf('ตารางสอนแทน') >= 0 && flex.altText.indexOf(disp(subNames[0])) >= 0, 'altText (แสดงในการแจ้งเตือน) มีชื่อผู้สอนแทน');
 // ── โครงสร้างตารางแบบเดียวกับภาพ: หัวตาราง + แถวละคาบ ──
@@ -158,21 +158,29 @@ const table = body0.find((c) => c.type === 'box' && c.layout === 'vertical');
 const allRows0 = (tb) => tb.contents.filter((c) => c.type === 'box');
 const cellTexts = (r) => r.contents.filter((c) => c.type === 'box').map((c) => c.contents[0]);
 const colHead = cellTexts(table.contents[0]).map((c) => c.text);
-ok(table.contents[0].contents[0].flex >= 2 && allRows0(table).every((r) => r.contents[0].flex === table.contents[0].contents[0].flex), 'คอลัมน์ "คาบ" กว้างขึ้น (flex ≥ 2) ให้คำว่า "คาบ" อยู่บรรทัดเดียว');
-const allRows = table.contents.filter((c) => c.type === 'box');
-ok(allRows.every((r) => r.contents.filter((c) => c.type === 'separator').length === 5) && table.contents.filter((c) => c.type === 'separator').length === allRows.length - 1 && table.borderWidth,
+ok(table.contents[0].contents[0].flex >= 2 && allRows0(table).filter((r) => r.layout === 'horizontal').every((r) => r.contents[0].flex === table.contents[0].contents[0].flex), 'คอลัมน์ "คาบ" กว้างขึ้น (flex ≥ 2) ให้คำว่า "คาบ" อยู่บรรทัดเดียว');
+// แถวข้อมูล/หัวตาราง = กล่องแนวนอน; แถวหัวกลุ่ม (ชื่อครูที่ไม่อยู่ เมื่อไม่อยู่หลายคน) = กล่องแนวตั้ง
+const allBoxes = table.contents.filter((c) => c.type === 'box');
+const allRows = allBoxes.filter((c) => c.layout === 'horizontal');
+const groupRows = allBoxes.filter((c) => c.layout === 'vertical');
+ok(allRows.every((r) => r.contents.filter((c) => c.type === 'separator').length === 4) && table.contents.filter((c) => c.type === 'separator').length === allBoxes.length - 1 && table.borderWidth,
   'เส้นตารางครบ: เส้นตั้งคั่นทุกคอลัมน์ทุกแถว (รวมหัวตาราง) + เส้นนอนคั่นทุกแถว + กรอบนอก');
-ok(colHead.join('|') === 'คาบ|เวลา|ห้อง|วิชา|ครูที่ไม่อยู่|ครูสอนแทน', 'หัวตาราง 6 คอลัมน์ เหมือนในภาพ: ' + colHead.join('|'));
+ok(colHead.join('|') === 'คาบ|เวลา|ห้อง|วิชา|ครูสอนแทน', 'หัวตาราง 5 คอลัมน์ (พอดีบรรทัดเดียวในการ์ดกว้าง 300px): ' + colHead.join('|'));
+const groupNames = groupRows.map((g) => g.contents[0].text);
+ok(groupNames.length >= 1 && groupNames.every((g) => /^แทนครู/.test(g)) && groupNames.some((g) => g === 'แทนครูสมชาย (ลาป่วย)') && new Set(groupNames).size === groupNames.length,
+  'ไม่อยู่หลายคน → มีแถวหัวกลุ่มชื่อครูที่ไม่อยู่ คนละแถว: ' + groupNames.join(' | '));
 const dataRows = allRows.slice(1);
 const cellsOf = (r) => cellTexts(r).map((c) => c.text);
-ok(dataRows.length === slotsCount && dataRows.every((r) => cellsOf(r).length === 6), 'หนึ่งแถวต่อหนึ่งคาบ (' + dataRows.length + ' แถว) แถวละ 6 ช่อง');
-const pNums = dataRows.map((r) => +cellsOf(r)[0]);
-ok(pNums.join() === pNums.slice().sort((a, b) => a - b).join(), 'เรียงคาบจากเช้าไปเย็น: ' + pNums.join());
+ok(dataRows.length === slotsCount && dataRows.every((r) => cellsOf(r).length === 5), 'หนึ่งแถวต่อหนึ่งคาบ (' + dataRows.length + ' แถว) แถวละ 5 ช่อง');
+// ภายในแต่ละกลุ่มเรียงคาบจากเช้าไปเย็น
+const groupsP = [];
+allBoxes.slice(1).forEach((b) => { if (b.layout === 'vertical') groupsP.push([]); else groupsP[groupsP.length - 1].push(+cellsOf(b)[0]); });
+ok(groupsP.every((g) => g.length && g.join() === g.slice().sort((a, b) => a - b).join()), 'แต่ละกลุ่มเรียงคาบจากเช้าไปเย็น: ' + groupsP.map((g) => g.join()).join(' | '));
 ok(/^\d\d:\d\d–\d\d:\d\d$/.test(cellsOf(dataRows[0])[1]) && /^ป\./.test(cellsOf(dataRows[0])[2]), 'ช่องเวลา (08:30–09:30) และห้อง (ป.…) ตรงตำแหน่ง');
-const openRows = dataRows.filter((r) => cellsOf(r)[5] === 'ยังไม่มีผู้สอนแทน');
-ok(openRows.length >= 1 && openRows.every((r) => r.backgroundColor === '#fdecec' && cellTexts(r)[5].color === '#c62828'), 'คาบที่ยังไม่มีคนแทน: พื้นแดงอ่อน ตัวหนังสือแดง');
-const doneRows = dataRows.filter((r) => cellsOf(r)[5] !== 'ยังไม่มีผู้สอนแทน');
-ok(doneRows.length >= 1 && doneRows.every((r) => cellTexts(r)[5].weight === 'bold' && cellTexts(r)[5].color === '#0b7a3e' && r.backgroundColor !== '#fdecec'), 'คาบที่มีผู้สอนแทน: ชื่อครูสีเขียวตัวหนา');
+const openRows = dataRows.filter((r) => cellsOf(r)[4] === 'ยังไม่มี');
+ok(openRows.length >= 1 && openRows.every((r) => r.backgroundColor === '#fdecec' && cellTexts(r)[4].color === '#c62828'), 'คาบที่ยังไม่มีคนแทน: พื้นแดงอ่อน ตัวหนังสือแดง');
+const doneRows = dataRows.filter((r) => cellsOf(r)[4] !== 'ยังไม่มี');
+ok(doneRows.length >= 1 && doneRows.every((r) => cellTexts(r)[4].weight === 'bold' && cellTexts(r)[4].color === '#0b7a3e' && r.backgroundColor !== '#fdecec'), 'คาบที่มีผู้สอนแทน: ชื่อครูสีเขียวตัวหนา');
 const meta = flex.contents.footer.contents.find((c) => c.type === 'box' && c.layout === 'horizontal');
 ok(meta && /^ผู้จัด: /.test(meta.contents[0].text) && /^จัดทำเมื่อ \d{1,2} \S+ 25\d\d \d\d:\d\d น\.$/.test(meta.contents[1].text), 'ท้ายการ์ด: "ผู้จัด: …" ซ้าย และ "จัดทำเมื่อ 13 พ.ย. 2569 16:14 น." ขวา เหมือนท้ายภาพ: ' + (meta && meta.contents[1].text));
 ok(flex.contents.size === 'mega' /* giga กว้างเกินจอมือถือ */ && flex.contents.header.contents[1].contents[0].text === 'ตารางสอนแทน', 'หัวการ์ด: ชื่อโรงเรียน / ตารางสอนแทน / วันที่ + ป้ายจำนวนคาบ');
