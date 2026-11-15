@@ -134,7 +134,7 @@
   <div id="adminBox" style="display:none">
     <div class="card">
       <div class="card-h"><h2>ข้อมูลครูและตารางสอน</h2></div>
-      <div class="muted small">แก้รายชื่อครู คาบเรียน ตารางสอน และข้อความตั้งค่า (ชื่อโรงเรียน ผู้จัด ข้อความท้ายประกาศ) ได้ใน Google Sheet แล้วให้ครูกด “โหลดข้อมูลใหม่” ในหน้าจัดสอนแทน</div>
+      <div class="muted small">แก้รายชื่อครู คาบเรียน ตารางสอน และข้อความตั้งค่า (ชื่อโรงเรียน ผู้จัด ข้อความท้ายประกาศ) ได้ใน Google Sheet แล้วให้ครูเปิดหน้าจัดสอนแทนใหม่ (รีเฟรช) เพื่อดึงข้อมูลล่าสุด</div>
       <button class="btn line block" id="openSheetBtn" type="button" style="margin-top:10px">เปิด Google Sheet</button>
     </div>
 
@@ -593,7 +593,7 @@ $('#impPreview').addEventListener('click', function (e) {
     toast('นำเข้าแล้ว ✓ ' + r.rows + ' คาบ' + (r.teachersAdded ? ' · เพิ่มครู ' + r.teachersAdded + ' คน' : ''));
     $('#impPreview').style.display = 'none';
     $('#impFile').value = '';
-    impStatus('นำเข้าเรียบร้อย: ' + r.rows + ' คาบ' + (r.teachersAdded ? ', เพิ่มครูใหม่ ' + r.teachersAdded + ' คน' : '') + (r.deactivated ? ', ปิดใช้งานครู ' + r.deactivated + ' คน' : '') + ' — ให้ครูกด “โหลดข้อมูลครู/ตารางสอนใหม่” (แท็บ เพิ่มเติม) ในหน้าจัดสอนแทน');
+    impStatus('นำเข้าเรียบร้อย: ' + r.rows + ' คาบ' + (r.teachersAdded ? ', เพิ่มครูใหม่ ' + r.teachersAdded + ' คน' : '') + (r.deactivated ? ', ปิดใช้งานครู ' + r.deactivated + ' คน' : '') + ' — ให้ครูเปิดหน้าจัดสอนแทนใหม่ (รีเฟรช) เพื่อใช้ตารางใหม่');
   }).catch(fail).then(function () { loading(false); });
 });
 

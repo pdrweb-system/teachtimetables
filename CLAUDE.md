@@ -31,7 +31,7 @@ LINE ──webhook POST {destination,events}──► /exec เดียวก�
 
 | ไฟล์ | หน้าที่ |
 |---|---|
-| `index.html` | หน้าครู: จัดสอนแทน / สถิติ / เพิ่มเติม (HTML+CSS+JS ไฟล์เดียว, ไม่มี build step) — ขึ้น GitHub Pages |
+| `index.html` | หน้าครู: จัดสอนแทน / สถิติ (HTML+CSS+JS ไฟล์เดียว, ไม่มี build step) — ขึ้น GitHub Pages |
 | `admin.html` | หน้าผู้ดูแล: เข้าสู่ระบบ/ตั้งรหัสครั้งแรก → LINE token, เลือกกลุ่ม, นำเข้า PDF, เปลี่ยนรหัส (ไฟล์เดียว; โค้ด `run`/toast/loading/คัดลอก/ตรวจ flex-gap และ CSS พื้นฐาน ซ้ำกับ index.html — แก้ที่ใดต้องดูอีกที่ด้วย; CSS ของหน้านี้มีเฉพาะ class ที่หน้านี้ใช้) |
 | `apps-script/Code.gs` | Backend JSON API + LINE webhook — **คัดลอกไปวางใน Apps Script เอง** (ไม่ได้ deploy อัตโนมัติจาก repo) |
 | `tests/gasmock.js` | Mock ของ SpreadsheetApp/DriveApp/UrlFetchApp/ฯลฯ ในหน่วยความจำ ให้รัน Code.gs ใน Node ได้ |
@@ -49,6 +49,7 @@ LINE ──webhook POST {destination,events}──► /exec เดียวก�
 ## สถานะปัจจุบัน
 
 **เสร็จแล้ว**
+- 2026-11-15: ตัดแท็บ "เพิ่มเติม" ออกจากหน้าครู (ผู้ใช้สั่ง) — ไม่มีช่อง URL/ปุ่มโหลดใหม่/วิธีใช้/ลิงก์ admin ในหน้าครูแล้ว; Code.gs ไม่ได้แก้; e2e 80
 - 2026-11-14: ปรับ UI ให้ใช้ง่ายบนมือถือ (ผู้ใช้สั่ง "ปรับหน้า ui ให้ใช้งานง่ายในมือถือ") ทั้ง index.html และ admin.html — รายละเอียดในหัวข้อ "หน้าเว็บ"; **Code.gs ไม่ได้แก้** (ไม่ต้อง Deploy ใหม่); เทสต์ API 73, Flex 40, import 22, e2e 80
 - เวอร์ชันแรก (Apps Script HtmlService: `Code.gs` + `Index.html`) ทำครบทุกฟีเจอร์ ทดสอบด้วย mock แล้ว
 - แปลงเป็น GitHub Pages + API: `index.html` push ขึ้น repo แล้ว (commit `4cc1957`, 2026-09-27) — แทน `google.script.run` ด้วย `fetch()` และมีช่องกรอก URL API ในแท็บตั้งค่า
@@ -68,7 +69,7 @@ LINE ──webhook POST {destination,events}──► /exec เดียวก�
 1. Merge branch `claude/upbeat-curie-mt0k04` เข้า `main` (GitHub Pages เสิร์ฟจาก `main` — ก่อน merge หน้าเว็บจริงยังเป็น commit `4cc1957`)
 2. เปิด GitHub Pages: repo Settings → Pages → Deploy from branch `main` / root
 3. วาง `apps-script/Code.gs` ทับใน Apps Script → Deploy → จัดการการทำให้ใช้งานได้ → แก้ไข → **เวอร์ชันใหม่**
-4. วาง URL `/exec` ใน `config.js` (`apiUrl`) ครั้งเดียวแล้ว Commit — ทุกเครื่องใช้ร่วมกัน (หน้า admin มีกล่อง "ตั้งให้ทุกเครื่อง" สร้างบรรทัดให้); ทางเลือก: กรอกต่อเครื่องในแท็บ เพิ่มเติม
+4. วาง URL `/exec` ใน `config.js` (`apiUrl`) ครั้งเดียวแล้ว Commit — ทุกเครื่องใช้ร่วมกัน (หน้า admin มีกล่อง "ตั้งให้ทุกเครื่อง" สร้างบรรทัดให้); ทางเลือก: กรอกต่อเครื่องที่ admin.html
 5. ตรวจ Webhook URL ใน LINE Developers Console ให้เป็น `/exec` เดียวกัน
 6. ถ้าเคยมี UI เดิมใน Apps Script ให้ลบไฟล์ `Index` ออก (doGet ไม่ใช้แล้ว)
 
@@ -138,8 +139,8 @@ Script Properties: `SS_ID`, `FOLDER_ID` (โฟลเดอร์ Drive "ภา�
 
 - state กลางอยู่ใน `S` (`init`, `date`, `dd`, `plan`, `dirty`, `img`, `imgDrive`); `render()` สร้างรายการครูที่ไม่อยู่ใหม่ทั้งหมด แล้วเรียก `renderState()` (ป้ายวัน/สถานะ, แถบความคืบหน้า, ข้อความปุ่มบันทึก, class `nowork` ที่ body และ `dirty` ที่ html) + event delegation
 - **ช่องข้อความ (หมายเหตุ/ห้อง/วิชา) และเหตุผล เรียกแค่ `markDirty(); renderState()` — ห้ามเรียก `render()` ใน `change`/`input` ของช่องพวกนี้**: ถ้าสร้างรายการใหม่ตอนผู้ใช้แตะช่องถัดไป ช่องนั้นจะหลุดโฟกัสและแป้นพิมพ์มือถือปิด (e2e มีข้อทดสอบ "พิมพ์ห้องแล้วแตะช่องวิชา"); เปลี่ยน "คาบ" ของคาบที่เพิ่มเองเท่านั้นที่ `render()` (ครูที่ว่างเปลี่ยน)
-- URL ของ API: `cfgUrl()` อ่านจาก `config.js` (`window.APP_CONFIG.apiUrl`, ตั้งครั้งเดียวใช้ทุกเครื่อง — ผู้ใช้สั่ง 2026-11-13; ไฟล์เป็นสาธารณะ = URL เปิดเผย) ถ้าว่างใช้ localStorage `apiUrl` (กรอกต่อเครื่อง); `apiUrl() = cfgUrl() || load('apiUrl')` ทั้ง index.html และ admin.html; ตั้งใน config.js แล้วช่องกรอกในหน้า index ถูกล็อกและการ์ด "การเชื่อมต่อ API" ถูกย้ายไปล่างสุดของแท็บ เพิ่มเติม; e2e ทดสอบโดยให้ server ทดสอบเสิร์ฟ `/config.js` แทน (`globalThis.__configJs`)
-- แท็บ (index.html): จัดสอนแทน / สถิติ / เพิ่มเติม (วิธีใช้ + ปุ่มคัดลอกคำสั่ง, โหลดข้อมูลใหม่, ลิงก์ไป admin.html, URL API); หน้าต่างแบบ bottom sheet 3 ตัว: `#pickModal` (เลือกครูที่ไม่อยู่ + ค้นหา), `#subModal` (เลือกครูสอนแทนของคาบ), `#previewModal` (ภาพ + แจ้งไลน์)
+- URL ของ API: `cfgUrl()` อ่านจาก `config.js` (`window.APP_CONFIG.apiUrl`, ตั้งครั้งเดียวใช้ทุกเครื่อง — ผู้ใช้สั่ง 2026-11-13; ไฟล์เป็นสาธารณะ = URL เปิดเผย) ถ้าว่างใช้ localStorage `apiUrl` (กรอกต่อเครื่อง); `apiUrl() = cfgUrl() || load('apiUrl')` ทั้ง index.html และ admin.html; **หน้า index ไม่มีช่องกรอก URL แล้ว** — กรอกต่อเครื่องทำที่ admin.html (`#urlBox`, localStorage ใช้ร่วมกัน); ถ้ายังไม่มี URL หน้า index แสดงข้อความพร้อมลิงก์ไป admin.html (ลิงก์นี้มีเฉพาะกรณีนั้น); e2e ทดสอบโดยให้ server ทดสอบเสิร์ฟ `/config.js` แทน (`globalThis.__configJs`)
+- แท็บ (index.html): จัดสอนแทน / สถิติ เท่านั้น (**แท็บ "เพิ่มเติม" ถูกตัดออกตามที่ผู้ใช้สั่ง 2026-11-15 — อย่าเพิ่มเมนูตั้งค่า/ลิงก์ผู้ดูแลกลับเข้าหน้าครู**; ครูดึงข้อมูลใหม่ด้วยการรีเฟรชหน้า; ผู้ดูแลเปิด admin.html จาก URL โดยตรง); หน้าต่างแบบ bottom sheet 3 ตัว: `#pickModal` (เลือกครูที่ไม่อยู่ + ค้นหา), `#subModal` (เลือกครูสอนแทนของคาบ), `#previewModal` (ภาพ + แจ้งไลน์)
 - **จัดอัตโนมัติ** (`autoAssign`): เรียงคาบจากเช้าไปเย็น เลือกครูว่างที่ `score` ต่ำสุด = สอนแทนเดือนนี้ + สอนแทนวันนี้×2 + คาบสอนเอง×0.3, เสมอกันให้กลุ่มสาระเดียวกับครูที่ลาก่อน
 - ครูว่าง (`candidates`) = ใช้งานอยู่ ∧ ไม่ได้ลา ∧ ไม่มีคาบตัวเองในคาบนั้น ∧ ยังไม่ถูกจัดคาบนั้น; `slotConflict` แสดงแถบแดง
 - **ภาพ** วาดด้วย canvas 1080px (`drawImage`), ตัดบรรทัดภาษาไทยด้วย `Intl.Segmenter('th')` (มี regex fallback), ฟอนต์ Sarabun จาก Google Fonts, ส่งออก JPEG 0.92
