@@ -506,7 +506,7 @@ function buildLineMessage_(dd, allowMention) {
 // ไม่แท็กชื่อ (ไม่ผูกครูกับ LINE userId) — การ์ดแสดงชื่อครูผู้สอนแทนเป็นตัวหนังสือ
 // ข้อจำกัดของ LINE: bubble ≤ 30 KB, carousel ≤ 12 bubble และ ≤ 50 KB, altText ≤ 1500 ตัวอักษร, text ห้ามเป็นค่าว่าง
 const FLEX = {
-  ROWS_PER_BUBBLE: 15,
+  ROWS_PER_BUBBLE: 12,
   MAX_BUBBLES: 12,
   MAX_BUBBLE_BYTES: 30000,
   MAX_CAROUSEL_BYTES: 50000,
@@ -555,30 +555,44 @@ function buildFlexMessage_(dd) {
 
   // ตารางแบบเดียวกับภาพตารางสอนแทน: คาบ | เวลา | ห้อง | วิชา | ครูที่ไม่อยู่ | ครูสอนแทน (แถวที่ยังไม่มีคนแทนเป็นสีแดง)
   const COLS = [
-    { t: 'คาบ', flex: 1, align: 'center', get: function (s) { return String(s.period || '-'); } },
+    { t: 'คาบ', flex: 2, align: 'center', get: function (s) { return String(s.period || '-'); } },
     { t: 'เวลา', flex: 3, align: 'center', size: 'xxs', get: function (s) { const p = pmap[s.period]; return p ? p.start + '–' + p.end : '-'; } },
     { t: 'ห้อง', flex: 2, align: 'center', get: function (s) { return s.room || '-'; } },
     { t: 'วิชา', flex: 4, get: function (s) { return s.subject || '-'; } },
     { t: 'ครูที่ไม่อยู่', flex: 4, get: function (s) { return disp(s.absent); } },
     { t: 'ครูสอนแทน', flex: 4, sub: true, get: function (s) { return s.sub ? disp(s.sub) : 'ยังไม่มีผู้สอนแทน'; } },
   ];
+  // เส้นตารางทุกช่อง: แต่ละช่องเป็นกล่องของตัวเอง (padding อยู่ในช่อง) คั่นด้วย separator แนวตั้งที่สูงเต็มแถว
+  // และมี separator แนวนอนคั่นทุกแถว (ผู้ใช้สั่ง 2026-11-15 หลังดูการ์ดในไลน์จริง)
+  const GRID = '#c3cedd';
   const cells = function (fn) {
-    return COLS.map(function (c) { return fn(c); });
+    const out = [];
+    COLS.forEach(function (c, i) {
+      if (i) out.push({ type: 'separator', color: GRID });
+      out.push({ type: 'box', layout: 'vertical', flex: c.flex, paddingAll: '4px', justifyContent: 'center', contents: [fn(c)] });
+    });
+    return out;
   };
   const headRow = {
-    type: 'box', layout: 'horizontal', spacing: 'xs', paddingAll: '6px', backgroundColor: '#e8eef7',
-    contents: cells(function (c) { return txt(c.t, { size: 'xs', weight: 'bold', color: C.head, flex: c.flex, align: c.align || 'start', gravity: 'center' }); }),
+    type: 'box', layout: 'horizontal', backgroundColor: '#e8eef7',
+    // คอลัมน์ "คาบ" เดิม flex 1 แคบจนในไลน์จริงถูกตัดเป็น "คา/บ" → ขยายเป็น flex 2 (ไม่ใช้ wrap:false เพราะถ้าไม่พอ LINE จะตัดเป็น "…" ซึ่งแย่กว่า)
+    contents: cells(function (c) { return txt(c.t, { size: 'xs', weight: 'bold', color: C.head, align: c.align || 'start' }); }),
   };
   const row = function (s, i) {
     return {
-      type: 'box', layout: 'horizontal', spacing: 'xs', paddingAll: '6px',
+      type: 'box', layout: 'horizontal',
       backgroundColor: s.sub ? (i % 2 ? '#f7f9fc' : '#ffffff') : '#fdecec',
       contents: cells(function (c) {
-        const o = { size: c.size || 'xs', flex: c.flex, align: c.align || 'start', gravity: 'center', color: C.ink };
+        const o = { size: c.size || 'xs', align: c.align || 'start', color: C.ink };
         if (c.sub) { o.weight = 'bold'; o.color = s.sub ? C.ok : C.err; }
         return txt(c.get(s), o);
       }),
     };
+  };
+  const grid = function (rows) { // หัวตาราง + แถว โดยมีเส้นคั่นทุกแถว
+    const out = [headRow];
+    rows.forEach(function (s, i) { out.push({ type: 'separator', color: GRID }); out.push(row(s, i)); });
+    return out;
   };
 
   const bubble = function (rows, part, total, first, last, hidden) {
@@ -608,8 +622,8 @@ function buildFlexMessage_(dd) {
     if (rows.length) {
       body.push({
         type: 'box', layout: 'vertical', spacing: 'none', margin: first ? 'md' : 'none', cornerRadius: '8px',
-        borderWidth: 'light', borderColor: '#c3cedd',
-        contents: [headRow].concat(rows.map(function (s, i) { return row(s, i); })),
+        borderWidth: 'light', borderColor: GRID,
+        contents: grid(rows),
       });
     }
     if (last && hidden) body.push(txt('…และอีก ' + hidden + ' คาบ (ดูครบในภาพตาราง)', { size: 'sm', color: C.err }));
