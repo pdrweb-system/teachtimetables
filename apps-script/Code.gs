@@ -566,7 +566,7 @@ function buildFlexMessage_(dd) {
     { t: 'คาบ', flex: 14, align: 'center', get: function (s) { return String(s.period || '-'); } },
     { t: 'เวลา', flex: 39, align: 'center', get: function (s) { const p = pmap[s.period]; return p ? p.start + '–' + p.end : '-'; } },
     { t: 'ห้อง', flex: 16, align: 'center', get: function (s) { return s.room || '-'; } },
-    { t: 'วิชา', flex: 34, get: function (s) { return s.subject || '-'; } },
+    { t: 'วิชา', flex: 34, headAlign: 'center', get: function (s) { return s.subject || '-'; } },
     { t: 'ครูสอนแทน', flex: 37, sub: true, get: function (s) { return s.sub ? disp(s.sub) : 'ยังไม่มี'; } },
   ];
   // เส้นตารางทุกช่อง: แต่ละช่องเป็นกล่องของตัวเอง (padding อยู่ในช่อง) คั่นด้วย separator แนวตั้งที่สูงเต็มแถว
@@ -583,7 +583,7 @@ function buildFlexMessage_(dd) {
   const headRow = {
     type: 'box', layout: 'horizontal', backgroundColor: '#e8eef7',
     // ไม่ใช้ wrap:false: ถ้าข้อความยาวเกินช่องจริง ๆ ให้ขึ้นบรรทัดใหม่ ดีกว่าถูก LINE ตัดเป็น "…"
-    contents: cells(function (c) { return txt(c.t, { size: 'xxs', weight: 'bold', color: C.head, align: c.align || 'start' }); }),
+    contents: cells(function (c) { return txt(c.t, { size: 'xxs', weight: 'bold', color: C.head, align: c.headAlign || c.align || 'start' }); }),
   };
   const row = function (s, i) {
     return {
