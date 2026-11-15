@@ -419,6 +419,23 @@ const lineEvent = (events) => doPost({ postData: { contents: JSON.stringify({ de
 
     await page.click('[data-close="previewModal"]');
 
+    // ── ดูภาพของ "พรุ่งนี้" → คำสั่งไลน์เป็นของพรุ่งนี้ ──
+    await setClock('2026-09-27'); // สมมติวันนี้เป็นวันก่อนหน้า → วันที่จัดไว้คือพรุ่งนี้
+    await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+    await page.waitForFunction(() => S.date === '2026-09-27'); // หน้าเลื่อนตาม "วันนี้" เอง
+    await idle();
+    await page.click('#tomorrowBtn');
+    await idle();
+    await page.click('#saveBtn');
+    await page.waitForSelector('#previewModal.on');
+    ok(await hasClass('#tomorrowBtn', 'on') && (await page.textContent('#lineCmdText')) === 'แจ้งตารางสอนแทนพรุ่งนี้' &&
+      await page.getAttribute('#lineOpenBtn', 'href') === 'https://line.me/R/share?text=' + encodeURIComponent('แจ้งตารางสอนแทนพรุ่งนี้'), 'ดูภาพของพรุ่งนี้ → ให้คัดลอก/ส่งคำว่า แจ้งตารางสอนแทนพรุ่งนี้');
+    await page.click('#copyCmdBtn');
+    await toastHas('คัดลอก “แจ้งตารางสอนแทนพรุ่งนี้” แล้ว');
+    await page.click('[data-close="previewModal"]');
+    await setClock(DATE);
+    await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+
     // ── สถิติ ──
     await page.click('nav.tabbar button[data-tab="stats"]');
     await page.fill('#statMonth', DATE.slice(0, 7));
