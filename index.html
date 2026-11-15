@@ -303,7 +303,7 @@
     </div>
     <div class="sheet-f">
       <div class="linebox">
-        <div>📣 <b>แจ้งในกลุ่มไลน์:</b> ส่งคำว่า <code class="cmd">แจ้งตารางสอนแทน</code> ในกลุ่ม บอทจะตอบเป็นการ์ดตารางสอนแทนให้ทันที</div>
+        <div>📣 <b>แจ้งในกลุ่มไลน์:</b> ส่งคำว่า <code class="cmd" id="lineCmdText">แจ้งตารางสอนแทน</code> ในกลุ่ม บอทจะตอบเป็นการ์ดตารางสอนแทนให้ทันที</div>
         <div class="row" style="margin-top:8px">
           <button class="btn ok grow" id="copyCmdBtn" type="button"><span class="em">📋 </span>คัดลอกคำสั่ง</button>
           <a class="btn line grow" id="lineOpenBtn" href="https://line.me/R/share?text=%E0%B9%81%E0%B8%88%E0%B9%89%E0%B8%87%E0%B8%95%E0%B8%B2%E0%B8%A3%E0%B8%B2%E0%B8%87%E0%B8%AA%E0%B8%AD%E0%B8%99%E0%B9%81%E0%B8%97%E0%B8%99" target="_blank" rel="noopener">เปิดไลน์เพื่อส่ง</a>
@@ -493,7 +493,15 @@ function todayStr() {
 function fail(e) { toast(errMsg(e), true); }
 
 /* ─── คัดลอกคำสั่งสำหรับพิมพ์ในกลุ่มไลน์ ─── */
-var LINE_CMD = 'แจ้งตารางสอนแทน'; // ต้องตรงกับที่บอทรอรับใน Code.gs (handleText_)
+// ต้องตรงกับ LINE_COMMANDS ใน Code.gs: คำสั่งของวันนี้ และของพรุ่งนี้
+var LINE_CMD = 'แจ้งตารางสอนแทน';
+var LINE_CMD_TOMORROW = 'แจ้งตารางสอนแทนพรุ่งนี้';
+// คำสั่งที่ตรงกับวันที่กำลังดู: ดูของพรุ่งนี้อยู่ → ใช้คำสั่งของพรุ่งนี้ (วันอื่น ๆ บอทไม่มีคำสั่งให้ จึงใช้ของวันนี้)
+function lineCmd() { return S.date && S.date === addDays(todayStr(), 1) ? LINE_CMD_TOMORROW : LINE_CMD; }
+function showLineCmd() {
+  $('#lineCmdText').textContent = lineCmd();
+  $('#lineOpenBtn').href = 'https://line.me/R/share?text=' + encodeURIComponent(lineCmd());
+}
 function legacyCopy(text) {
   return new Promise(function (resolve, reject) {
     var ta = document.createElement('textarea');
@@ -516,14 +524,14 @@ function copyText(text) {
   return legacyCopy(text);
 }
 function copyCmd() {
-  copyText(LINE_CMD).then(function () {
-    toast('คัดลอก “' + LINE_CMD + '” แล้ว — เปิดกลุ่มไลน์แล้ววางส่งได้เลย');
+  var cmd = lineCmd();
+  copyText(cmd).then(function () {
+    toast('คัดลอก “' + cmd + '” แล้ว — เปิดกลุ่มไลน์แล้ววางส่งได้เลย');
   }).catch(function () {
-    toast('คัดลอกไม่ได้ — พิมพ์คำว่า ' + LINE_CMD + ' ในกลุ่มไลน์แทน', true);
+    toast('คัดลอกไม่ได้ — พิมพ์คำว่า ' + cmd + ' ในกลุ่มไลน์แทน', true);
   });
 }
 $('#copyCmdBtn').onclick = copyCmd;
-$('#lineOpenBtn').href = 'https://line.me/R/share?text=' + encodeURIComponent(LINE_CMD);
 
 /* ═══════════════ เริ่มต้น ═══════════════ */
 // คืนค่า Promise<boolean> — true เมื่อโหลดข้อมูลจาก API ได้
@@ -1109,6 +1117,7 @@ function openPreview() {
     S.img = data; S.imgDrive = null;
     $('#previewImg').src = data;
     loading(false);
+    showLineCmd();
     openModal('previewModal');
     // เก็บภาพลง Drive เบื้องหลัง เพื่อให้คำสั่ง "สอนแทน" ในกลุ่มไลน์ส่งภาพได้
     run('saveImageToDrive', S.date, data).then(function (r) { if (S.img === data) S.imgDrive = r; }).catch(function () {});

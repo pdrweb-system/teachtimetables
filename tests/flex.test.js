@@ -182,7 +182,17 @@ globalThis.todayStr_ = (o) => realToday((o || 0) + 1); // พรุ่งนี�
 rep = say('แจ้งตารางสอนแทน');
 globalThis.todayStr_ = realToday;
 ok(rep.length === 1 && rep[0].payload.messages[0].type === 'text' && rep[0].payload.messages[0].text.indexOf('วันอังคารที่ 29 กันยายน 2569') >= 0, 'วันที่ไม่มีการจัด → ตอบข้อความแจ้ง');
-['แจ้งตารางสอนแทน พรุ่งนี้', 'แจ้งตารางสอนแทนพรุ่งนี้', 'แจ้งตารางสอนแทนครับ', 'คำสั่ง', 'สอนแทน'].forEach((t) => ok(say(t).length === 0, 'ข้อความอื่นไม่ตอบ: ' + t));
+['แจ้งตารางสอนแทนมะรืน', 'แจ้งตารางสอนแทนครับ', 'คำสั่ง', 'สอนแทน', 'พรุ่งนี้'].forEach((t) => ok(say(t).length === 0, 'ข้อความอื่นไม่ตอบ: ' + t));
+
+// ── 3b) "แจ้งตารางสอนแทนพรุ่งนี้" → ของวันถัดไป ──
+rep = say('แจ้งตารางสอนแทนพรุ่งนี้');
+ok(rep.length === 1 && rep[0].payload.messages[0].type === 'text' && rep[0].payload.messages[0].text.indexOf('วันอังคารที่ 29 กันยายน 2569') >= 0, 'แจ้งตารางสอนแทนพรุ่งนี้ (พรุ่งนี้ยังไม่จัด) → ข้อความแจ้งของวันพรุ่งนี้');
+globalThis.todayStr_ = (o) => realToday((o || 0) - 1); // สมมติวันนี้ = วันอาทิตย์ → พรุ่งนี้ = วันที่จัดไว้
+rep = say('แจ้งตารางสอนแทน พรุ่งนี้');
+const repToday = say('แจ้งตารางสอนแทน');
+globalThis.todayStr_ = realToday;
+ok(rep.length === 1 && rep[0].payload.messages[0].type === 'flex' && flexProblems(rep[0].payload.messages[0]).length === 0 && allText(rep[0].payload.messages[0].contents).indexOf('วันจันทร์ที่ 28 กันยายน 2569') >= 0, 'แจ้งตารางสอนแทนพรุ่งนี้ → การ์ด Flex ของวันพรุ่งนี้ (มีเว้นวรรคก็ได้)');
+ok(repToday[0].payload.messages[0].type === 'text' && repToday[0].payload.messages[0].text.indexOf('วันอาทิตย์ที่ 27') >= 0, 'คำสั่งเดิมยังเป็นของวันนี้');
 
 // ── 4) มีภาพใน Drive → ปุ่มดูภาพ ──
 const img = post('saveImageToDrive', [DATE, 'data:image/jpeg;base64,AAAA']).result;

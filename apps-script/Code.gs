@@ -1014,12 +1014,15 @@ function reply_(token, messages) {
   lineApi_('/v2/bot/message/reply', { replyToken: token, messages: messages });
 }
 
-/** คำสั่งเดียว: "แจ้งตารางสอนแทน" (ของวันนี้) → reply เป็น Flex + ข้อความแท็กชื่อผู้สอนแทน; ข้อความอื่นไม่ตอบ */
-function handleText_(ev) {
-  const text = str_(ev.message.text).replace(/\s+/g, ' ');
-  if (text !== 'แจ้งตารางสอนแทน') return;
+/** คำสั่งที่บอทตอบ → วันที่นับจากวันนี้ (ต้องตรงกับ LINE_CMD ใน index.html); ข้อความอื่นไม่ตอบ */
+const LINE_COMMANDS = { 'แจ้งตารางสอนแทน': 0, 'แจ้งตารางสอนแทนพรุ่งนี้': 1 };
 
-  const dd = getDateData(todayStr_(0));
+/** "แจ้งตารางสอนแทน" (วันนี้) / "แจ้งตารางสอนแทนพรุ่งนี้" → reply เป็นการ์ด Flex; เว้นวรรคในคำสั่งไม่มีผล */
+function handleText_(ev) {
+  const text = str_(ev.message.text).replace(/\s+/g, '');
+  if (!Object.prototype.hasOwnProperty.call(LINE_COMMANDS, text)) return;
+
+  const dd = getDateData(todayStr_(LINE_COMMANDS[text]));
   if (!dd.subs.length) {
     reply_(ev.replyToken, [{ type: 'text', text: 'ยังไม่มีการจัดสอนแทนของ' + dd.thaiDate }]);
     return;
