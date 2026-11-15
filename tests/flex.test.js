@@ -175,7 +175,7 @@ const doneRows = dataRows.filter((r) => cellsOf(r)[5] !== 'ยังไม่ม
 ok(doneRows.length >= 1 && doneRows.every((r) => cellTexts(r)[5].weight === 'bold' && cellTexts(r)[5].color === '#0b7a3e' && r.backgroundColor !== '#fdecec'), 'คาบที่มีผู้สอนแทน: ชื่อครูสีเขียวตัวหนา');
 const meta = flex.contents.footer.contents.find((c) => c.type === 'box' && c.layout === 'horizontal');
 ok(meta && /^ผู้จัด: /.test(meta.contents[0].text) && /^จัดทำเมื่อ \d{1,2} \S+ 25\d\d \d\d:\d\d น\.$/.test(meta.contents[1].text), 'ท้ายการ์ด: "ผู้จัด: …" ซ้าย และ "จัดทำเมื่อ 13 พ.ย. 2569 16:14 น." ขวา เหมือนท้ายภาพ: ' + (meta && meta.contents[1].text));
-ok(flex.contents.size === 'giga' && flex.contents.header.contents[1].contents[0].text === 'ตารางสอนแทน', 'หัวการ์ด: ชื่อโรงเรียน / ตารางสอนแทน / วันที่ + ป้ายจำนวนคาบ');
+ok(flex.contents.size === 'mega' /* giga กว้างเกินจอมือถือ */ && flex.contents.header.contents[1].contents[0].text === 'ตารางสอนแทน', 'หัวการ์ด: ชื่อโรงเรียน / ตารางสอนแทน / วันที่ + ป้ายจำนวนคาบ');
 ok(!flex.contents.footer || !allText(flex.contents.footer).includes('"button"'), 'ยังไม่มีภาพ → ไม่มีปุ่มดูภาพ');
 
 
