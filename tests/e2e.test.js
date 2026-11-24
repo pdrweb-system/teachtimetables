@@ -353,11 +353,13 @@ const lineEvent = (events) => doPost({ postData: { contents: JSON.stringify({ de
     ok(settings_()['LINE groupId'] === 'G1' && await page.$eval('#groupList input[data-group="G1"]', (i) => i.checked), 'เอาติ๊กออกได้ เหลือกลุ่มเดียว');
     // Apps Script ยังเป็นโค้ดเก่า (คืนแค่ groupId, เก็บได้กลุ่มเดียว): ต้องเห็นกลุ่มที่เลือกอยู่ + คำเตือนให้ Deploy ใหม่ และเลือกได้ทีละกลุ่ม
     const newGetAdminData = globalThis.getAdminData, newSetLineGroup = globalThis.setLineGroup;
-    POST_API.getAdminData = (pw) => { const r = newGetAdminData(pw); delete r.groupIds; return r; };
+    ok((await page.textContent('#lineBox')).indexOf('เวอร์ชันล่าสุด') >= 0, 'หน้า admin บอกว่า Apps Script ใช้ Code.gs เวอร์ชันล่าสุด');
+    POST_API.getAdminData = (pw) => { const r = newGetAdminData(pw); delete r.groupIds; delete r.version; return r; };
     POST_API.setLineGroup = (pw, g) => newSetLineGroup(pw, String(g)); // โค้ดเก่าแปลงค่าเป็นข้อความกลุ่มเดียว
     await page.click('#loadLineBtn');
     await idle();
     ok(await page.$eval('#groupList input[data-group="G1"]', (i) => i.checked) && (await page.textContent('#lineBox')).indexOf('ยังเป็นโค้ดเวอร์ชันเก่า') >= 0, 'Code.gs เก่า: ยังเห็นติ๊กกลุ่มที่เลือกไว้ + เตือนให้ Deploy ใหม่');
+    ok((await page.textContent('#lineBox')).indexOf('เวอร์ชันเก่า') >= 0, 'Code.gs เก่า: แถว Apps Script บอกว่ายังเป็นเวอร์ชันเก่า');
     await page.click('#groupList label:has(input[data-group="GOTHER"])');
     await toastHas('บอทตอบ 1 กลุ่ม');
     await idle();

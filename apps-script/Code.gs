@@ -40,6 +40,8 @@ const DAYS = ['อาทิตย์', 'จันทร์', 'อังคาร
 const TH_MONTHS = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
   'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
 const TZ = 'Asia/Bangkok';
+// เวอร์ชันของโค้ดนี้ — หน้าผู้ดูแลแสดงค่านี้ ใช้ตรวจว่า URL /exec ที่หน้าเว็บเรียกอยู่ ใช้โค้ดที่วางล่าสุดแล้วหรือยัง (เปลี่ยนทุกครั้งที่แก้ Code.gs)
+const APP_VERSION = '2026-11-24b';
 const PROP = PropertiesService.getScriptProperties();
 
 // ───────────────────────── JSON API (หน้าเว็บอยู่บน GitHub Pages) ─────────────────────────
@@ -798,6 +800,7 @@ function getAdminData(pw) {
     lastEvent: PROP.getProperty('LAST_EVENT') || '',
     lastMismatch: PROP.getProperty('LAST_MISMATCH') || '',
     lastCommand: PROP.getProperty('LAST_COMMAND') || '',
+    version: APP_VERSION,
   };
 }
 
