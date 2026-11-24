@@ -389,10 +389,11 @@ $('#lineBox').addEventListener('click', function (e) {
 });
 $('#lineBox').addEventListener('change', function (e) {
   var el = e.target;
-  if (el.id === 'groupSel') {
+  if (el.getAttribute('data-group') != null) { // ติ๊กเลือกได้หลายกลุ่ม (เช่น กลุ่มครู + กลุ่มทดสอบ)
+    var ids = Array.prototype.map.call(document.querySelectorAll('#lineBox input[data-group]:checked'), function (x) { return x.getAttribute('data-group'); });
     loading(true, 'กำลังบันทึก…');
-    run('setLineGroup', ADMIN.pw, el.value).then(function () {
-      toast(el.value ? 'เลือกกลุ่มรับประกาศแล้ว ✓' : 'ล้างการเลือกกลุ่มแล้ว');
+    run('setLineGroup', ADMIN.pw, ids).then(function () {
+      toast(ids.length ? 'บันทึกแล้ว ✓ บอทตอบ ' + ids.length + ' กลุ่ม' : 'ล้างการเลือกกลุ่มแล้ว — บอทจะไม่ตอบในกลุ่มใด');
       return run('getAdminData', ADMIN.pw).then(renderLine);
     }).catch(fail).then(function () { loading(false); });
     return;
@@ -417,7 +418,7 @@ function renderLine(d) {
     (d.lastCommand ? '<div class="muted">คำสั่งล่าสุด</div><div><span class="pill ' + (/→ ตอบแล้ว$/.test(d.lastCommand) ? 'ok">ตอบแล้ว' : 'no">ไม่ได้ตอบ') + '</span> <span class="small muted">' + h(d.lastCommand) + '</span></div>' :
       '<div class="muted">คำสั่งล่าสุด</div><div><span class="small muted">ยังไม่เคยมีคนพิมพ์คำสั่งที่ระบบนี้ได้รับ</span></div>') +
     (d.lastMismatch ? '<div class="muted">ปัญหา</div><div><span class="pill no">บอทไม่ตรง</span> <span class="small muted">' + h(d.lastMismatch) + ' — วาง Token ของบอทตัวที่ส่ง event มา</span></div>' : '') +
-    '<div class="muted">กลุ่มรับประกาศ</div><div>' + (d.groupId ? '<span class="pill ok">เลือกแล้ว</span>' : '<span class="pill no">ยังไม่เลือก</span>') + '</div>' +
+    '<div class="muted">กลุ่มรับประกาศ</div><div>' + ((d.groupIds || []).length ? '<span class="pill ok">เลือกแล้ว ' + d.groupIds.length + ' กลุ่ม</span>' : '<span class="pill no">ยังไม่เลือก</span>') + '</div>' +
     '</div>' +
     '<div style="margin-top:14px"><div class="small muted">Webhook URL (นำไปวางใน LINE Developers)</div>' +
     // ใช้ URL /exec ที่หน้านี้เรียกอยู่จริง — ScriptApp.getService().getUrl() ฝั่งเซิร์ฟเวอร์อาจคืน URL อื่น (เช่น /dev)
@@ -427,11 +428,13 @@ function renderLine(d) {
     '<div class="row"><input type="password" id="tokenInput" class="grow" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Channel access token" placeholder="' + (d.hasToken ? '•••••• (บันทึกแล้ว — วางใหม่เพื่อเปลี่ยน)' : 'วาง token ที่นี่') + '">' +
     '<button type="button" class="btn sm pri" id="saveTokenBtn">บันทึก</button></div></div>' +
     '<h3 style="font-size:16px;margin:18px 0 4px">กลุ่มไลน์ที่ให้บอทตอบ</h3>' +
-    '<div class="muted small">บอทตอบคำสั่ง <code class="cmd">แจ้งตารางสอนแทน</code> เฉพาะกลุ่มที่เลือก (กลุ่มอื่นไม่ตอบ) กลุ่มจะโผล่ในรายการเมื่อมีคนพิมพ์อะไรก็ได้ในกลุ่มอย่างน้อย 1 ครั้ง (แล้วกด ↻ รีเฟรช)</div>' +
+    '<div class="muted small">ติ๊กกลุ่มที่ให้บอทตอบคำสั่ง <code class="cmd">แจ้งตารางสอนแทน</code> — เลือกได้หลายกลุ่ม เช่น กลุ่มครู + กลุ่มทดสอบ (กลุ่มที่ไม่ได้ติ๊กบอทไม่ตอบ) กลุ่มจะโผล่ในรายการเมื่อมีคนพิมพ์อะไรก็ได้ในกลุ่มอย่างน้อย 1 ครั้ง (แล้วกด ↻ รีเฟรช)</div>' +
     ((d.groups || []).length ? '' : '<div class="small" style="color:var(--err);margin-top:6px">ยังไม่เห็นกลุ่มไหนเลย — ดูแถว “รับ event จาก LINE ล่าสุด” ด้านบน: ถ้ายังไม่เคยได้รับ แปลว่า event ยังส่งมาไม่ถึงระบบนี้ (ตรวจ Webhook ใน LINE Developers หรือการส่งต่อจากระบบเดิม และตั้ง Deploy เป็น “ทุกคน”)</div>') +
-    '<select id="groupSel" style="margin-top:8px" aria-label="กลุ่มไลน์ที่ให้บอทตอบ"><option value="">— ยังไม่เลือก —</option>' + (d.groups || []).map(function (g) {
-      return '<option value="' + h(g.groupId) + '"' + (g.groupId === d.groupId ? ' selected' : '') + '>' + h((g.name || 'กลุ่มที่ไม่ทราบชื่อ') + (g.lastSeen ? ' · เห็นล่าสุด ' + g.lastSeen.slice(0, 16) : '')) + '</option>';
-    }).join('') + '</select>' +
+    '<div id="groupList" style="margin-top:6px">' + (d.groups || []).map(function (g) {
+      var on = (d.groupIds || []).indexOf(g.groupId) >= 0;
+      return '<label class="opt"><input type="checkbox" data-group="' + h(g.groupId) + '"' + (on ? ' checked' : '') + '>' +
+        '<span><b>' + h(g.name || 'กลุ่มที่ไม่ทราบชื่อ') + '</b>' + (g.lastSeen ? '<br><span class="small muted">เห็นล่าสุด ' + h(g.lastSeen.slice(0, 16)) + '</span>' : '') + '</span></label>';
+    }).join('') + '</div>' +
     '<button type="button" class="link" id="loadLineBtn">↻ รีเฟรช</button>';
   $('#lineBox').innerHTML = html;
 }
