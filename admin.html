@@ -390,6 +390,10 @@ $('#lineBox').addEventListener('click', function (e) {
 $('#lineBox').addEventListener('change', function (e) {
   var el = e.target;
   if (el.getAttribute('data-group') != null) { // ติ๊กเลือกได้หลายกลุ่ม (เช่น กลุ่มครู + กลุ่มทดสอบ)
+    // Apps Script ยังเป็นโค้ดเก่า (เก็บได้กลุ่มเดียว) → ทำงานแบบเลือกได้ทีละกลุ่ม ให้สิ่งที่เห็นตรงกับที่บันทึกจริง
+    if (ADMIN.data && ADMIN.data.oneGroupOnly && el.checked) {
+      Array.prototype.forEach.call(document.querySelectorAll('#lineBox input[data-group]'), function (x) { if (x !== el) x.checked = false; });
+    }
     var ids = Array.prototype.map.call(document.querySelectorAll('#lineBox input[data-group]:checked'), function (x) { return x.getAttribute('data-group'); });
     loading(true, 'กำลังบันทึก…');
     run('setLineGroup', ADMIN.pw, ids).then(function () {
@@ -406,6 +410,9 @@ function loadLine() {
 }
 
 function renderLine(d) {
+  // Apps Script เวอร์ชันก่อน 2026-11-24 ส่งมาแค่ groupId (กลุ่มเดียว) ไม่มี groupIds — ยังไม่ได้วาง Code.gs ใหม่ + Deploy
+  d.oneGroupOnly = !d.groupIds;
+  if (!d.groupIds) d.groupIds = d.groupId ? [d.groupId] : [];
   ADMIN.data = d;
   var inCfg = !!cfgUrl();
   $('#cfgState').innerHTML = inCfg ? '<span class="pill ok">ตั้งไว้กลางแล้ว</span> ทุกเครื่องใช้ URL จาก config.js'
@@ -430,6 +437,7 @@ function renderLine(d) {
     '<h3 style="font-size:16px;margin:18px 0 4px">กลุ่มไลน์ที่ให้บอทตอบ</h3>' +
     '<div class="muted small">ติ๊กกลุ่มที่ให้บอทตอบคำสั่ง <code class="cmd">แจ้งตารางสอนแทน</code> — เลือกได้หลายกลุ่ม เช่น กลุ่มครู + กลุ่มทดสอบ (กลุ่มที่ไม่ได้ติ๊กบอทไม่ตอบ) กลุ่มจะโผล่ในรายการเมื่อมีคนพิมพ์อะไรก็ได้ในกลุ่มอย่างน้อย 1 ครั้ง (แล้วกด ↻ รีเฟรช)</div>' +
     ((d.groups || []).length ? '' : '<div class="small" style="color:var(--err);margin-top:6px">ยังไม่เห็นกลุ่มไหนเลย — ดูแถว “รับ event จาก LINE ล่าสุด” ด้านบน: ถ้ายังไม่เคยได้รับ แปลว่า event ยังส่งมาไม่ถึงระบบนี้ (ตรวจ Webhook ใน LINE Developers หรือการส่งต่อจากระบบเดิม และตั้ง Deploy เป็น “ทุกคน”)</div>') +
+    (d.oneGroupOnly ? '<div class="small" style="color:var(--err);background:var(--errbg);border-radius:10px;padding:8px 10px;margin-top:8px">⚠ Apps Script ยังเป็นโค้ดเวอร์ชันเก่า จึงเลือกได้ทีละ 1 กลุ่ม — วาง <b>Code.gs</b> ใหม่ แล้ว Deploy → จัดการการทำให้ใช้งานได้ → แก้ไข → <b>เวอร์ชันใหม่</b> จึงจะเลือกได้หลายกลุ่ม</div>' : '') +
     '<div id="groupList" style="margin-top:6px">' + (d.groups || []).map(function (g) {
       var on = (d.groupIds || []).indexOf(g.groupId) >= 0;
       return '<label class="opt"><input type="checkbox" data-group="' + h(g.groupId) + '"' + (on ? ' checked' : '') + '>' +
