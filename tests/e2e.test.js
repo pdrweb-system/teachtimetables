@@ -351,6 +351,27 @@ const lineEvent = (events) => doPost({ postData: { contents: JSON.stringify({ de
     await toastHas('บอทตอบ 1 กลุ่ม');
     await idle();
     ok(settings_()['LINE groupId'] === 'G1' && await page.$eval('#groupList input[data-group="G1"]', (i) => i.checked), 'เอาติ๊กออกได้ เหลือกลุ่มเดียว');
+    // Apps Script ยังเป็นโค้ดเก่า (คืนแค่ groupId, เก็บได้กลุ่มเดียว): ต้องเห็นกลุ่มที่เลือกอยู่ + คำเตือนให้ Deploy ใหม่ และเลือกได้ทีละกลุ่ม
+    const newGetAdminData = globalThis.getAdminData, newSetLineGroup = globalThis.setLineGroup;
+    POST_API.getAdminData = (pw) => { const r = newGetAdminData(pw); delete r.groupIds; return r; };
+    POST_API.setLineGroup = (pw, g) => newSetLineGroup(pw, String(g)); // โค้ดเก่าแปลงค่าเป็นข้อความกลุ่มเดียว
+    await page.click('#loadLineBtn');
+    await idle();
+    ok(await page.$eval('#groupList input[data-group="G1"]', (i) => i.checked) && (await page.textContent('#lineBox')).indexOf('ยังเป็นโค้ดเวอร์ชันเก่า') >= 0, 'Code.gs เก่า: ยังเห็นติ๊กกลุ่มที่เลือกไว้ + เตือนให้ Deploy ใหม่');
+    await page.click('#groupList label:has(input[data-group="GOTHER"])');
+    await toastHas('บอทตอบ 1 กลุ่ม');
+    await idle();
+    ok(settings_()['LINE groupId'] === 'GOTHER' && await page.$$eval('#groupList input:checked', (x) => x.map((i) => i.getAttribute('data-group')).join()) === 'GOTHER', 'Code.gs เก่า: เลือกได้ทีละกลุ่ม และสิ่งที่เห็นตรงกับที่บันทึก');
+    POST_API.getAdminData = newGetAdminData; POST_API.setLineGroup = newSetLineGroup;
+    await page.click('#loadLineBtn'); // Deploy โค้ดใหม่แล้วกดรีเฟรช → กลับมาเลือกได้หลายกลุ่ม
+    await idle();
+    ok((await page.textContent('#lineBox')).indexOf('ยังเป็นโค้ดเวอร์ชันเก่า') < 0, 'Code.gs ใหม่: ไม่มีคำเตือน');
+    await page.click('#groupList label:has(input[data-group="G1"])');
+    await toastHas('บอทตอบ 2 กลุ่ม');
+    await idle();
+    await page.click('#groupList label:has(input[data-group="GOTHER"])');
+    await toastHas('บอทตอบ 1 กลุ่ม');
+    await idle();
     ok(await page.$('select[data-teacher]') === null, 'ไม่มีส่วนผูกชื่อครูกับไลน์');
     ok(await page.$eval('#lineBox input[readonly]', (i) => i.value) === API, 'Webhook URL = URL /exec ที่หน้าเว็บใช้อยู่');
     await page.click('#lineBox [data-copy="#hookUrl"]');
