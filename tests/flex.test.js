@@ -166,6 +166,7 @@ const groupRows = allBoxes.filter((c) => c.layout === 'vertical');
 ok(allRows.every((r) => r.contents.filter((c) => c.type === 'separator').length === 4) && table.contents.filter((c) => c.type === 'separator').length === allBoxes.length - 1 && table.borderWidth,
   'เส้นตารางครบ: เส้นตั้งคั่นทุกคอลัมน์ทุกแถว (รวมหัวตาราง) + เส้นนอนคั่นทุกแถว + กรอบนอก');
 ok(colHead.join('|') === 'คาบ|เวลา|ห้อง|วิชา|ครูสอนแทน', 'หัวตาราง 5 คอลัมน์ (พอดีบรรทัดเดียวในการ์ดกว้าง 300px): ' + colHead.join('|'));
+ok(cellTexts(table.contents[0])[3].align === 'center' && cellTexts(allRows[1])[3].align === 'start', 'หัวคอลัมน์ "วิชา" อยู่กึ่งกลาง (ข้อมูลในคอลัมน์ยังชิดซ้าย)');
 const groupNames = groupRows.map((g) => g.contents[0].text);
 ok(groupNames.length >= 1 && groupNames.every((g) => /^แทนครู/.test(g)) && groupNames.some((g) => g === 'แทนครูสมชาย (ลาป่วย)') && new Set(groupNames).size === groupNames.length,
   'ไม่อยู่หลายคน → มีแถวหัวกลุ่มชื่อครูที่ไม่อยู่ คนละแถว: ' + groupNames.join(' | '));
