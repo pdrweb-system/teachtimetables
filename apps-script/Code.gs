@@ -141,7 +141,7 @@ function seedIfEmpty_() {
   if (st.getLastRow() < 2) {
     st.getRange(2, 1, 4, 3).setValues([
       [SET.SCHOOL, 'โรงเรียนตัวอย่าง', 'แสดงบนหัวภาพตารางสอนแทน'],
-      [SET.GROUP, '', 'ระบบกรอกให้อัตโนมัติเมื่อเชิญบอทเข้ากลุ่มไลน์'],
+      [SET.GROUP, '', 'กลุ่มที่บอทตอบคำสั่ง — เลือกในหน้าผู้ดูแล (หลายกลุ่มคั่นด้วยจุลภาค)'],
       [SET.SIGNER, 'งานวิชาการ', 'แสดงท้ายภาพ'],
       [SET.FOOTER, 'ขอบคุณคุณครูทุกท่านที่ช่วยดูแลนักเรียน 🙏', 'ข้อความท้ายประกาศในไลน์'],
     ]);
@@ -792,7 +792,8 @@ function getAdminData(pw) {
     webAppUrl: webAppUrl,
     hasToken: hasToken,
     bot: bot,
-    groupId: st[SET.GROUP] || '',
+    groupIds: selectedGroups_(),
+    groupId: selectedGroups_()[0] || '', // เดิมเลือกได้กลุ่มเดียว — คงไว้ให้โค้ดเก่าอ่านได้
     groups: knownGroups_(hasToken),
     lastEvent: PROP.getProperty('LAST_EVENT') || '',
     lastMismatch: PROP.getProperty('LAST_MISMATCH') || '',
@@ -803,8 +804,7 @@ function getAdminData(pw) {
 /** กลุ่มที่บอทเคยเห็น event (จาก GROUPS_SEEN) พร้อมชื่อกลุ่มจาก LINE — ให้ผู้ดูแลเลือกกลุ่มรับประกาศ */
 function knownGroups_(withNames) {
   const seen = groupsSeen_();
-  const cur = settings_()[SET.GROUP];
-  if (cur && !(cur in seen)) seen[cur] = '';
+  selectedGroups_().forEach(function (g) { if (!(g in seen)) seen[g] = ''; });
   return Object.keys(seen).sort(function (a, b) { return seen[b] < seen[a] ? -1 : (seen[b] > seen[a] ? 1 : 0); }).map(function (g) {
     let name = '';
     if (withNames) {
@@ -814,14 +814,21 @@ function knownGroups_(withNames) {
   });
 }
 
-/** เลือกกลุ่มรับประกาศ (บอทจะตอบคำสั่งเฉพาะกลุ่มนี้) — ส่ง groupId ว่างเพื่อล้างการเลือก */
-function setLineGroup(pw, groupId) {
+/** กลุ่มที่ให้บอทตอบคำสั่ง — เลือกได้หลายกลุ่ม (เช่น กลุ่มครู + กลุ่มทดสอบ; ผู้ใช้สั่ง 2026-11-24) เก็บในชีตตั้งค่าคั่นด้วยจุลภาค */
+function selectedGroups_() {
+  return str_(settings_()[SET.GROUP]).split(/[\s,]+/).filter(Boolean);
+}
+
+/** เลือกกลุ่มที่ให้บอทตอบ: groupIds = array (หรือข้อความ groupId เดียว แบบเดิม); ว่าง = ล้างการเลือก */
+function setLineGroup(pw, groupIds) {
   adminGuard_(pw);
-  groupId = str_(groupId);
-  if (groupId && !knownGroups_(false).some(function (g) { return g.groupId === groupId; })) {
-    throw new Error('ยังไม่เคยเห็นกลุ่มนี้ — ให้ใครสักคนพิมพ์อะไรก็ได้ในกลุ่มก่อน แล้วกดรีเฟรช');
-  }
-  setSetting_(SET.GROUP, groupId);
+  const list = (Array.isArray(groupIds) ? groupIds : str_(groupIds).split(/[\s,]+/))
+    .map(str_).filter(function (g, i, a) { return g && a.indexOf(g) === i; });
+  const known = knownGroups_(false).map(function (g) { return g.groupId; });
+  list.forEach(function (g) {
+    if (known.indexOf(g) < 0) throw new Error('ยังไม่เคยเห็นกลุ่มนี้ — ให้ใครสักคนพิมพ์อะไรก็ได้ในกลุ่มก่อน แล้วกดรีเฟรช');
+  });
+  setSetting_(SET.GROUP, list.join(','));
   return true;
 }
 
@@ -1016,9 +1023,9 @@ function handleEvent_(ev) {
   const cmd = commandOf_(ev);
   if (src.type === 'room') { if (cmd) noteCommand_(cmd, 'ไม่ตอบ: พิมพ์ในห้องแชต (room) — ใช้ในกลุ่มหรือแชต 1:1 แทน'); return; }
   if (src.type === 'group' && src.groupId) noteGroup_(src.groupId);
-  const group = settings_()[SET.GROUP];
-  if (src.type === 'group' && !group) { if (cmd) noteCommand_(cmd, 'ไม่ตอบ: ยังไม่ได้เลือก "กลุ่มไลน์ที่ให้บอทตอบ" ในหน้าผู้ดูแล'); return; }
-  if (src.type === 'group' && src.groupId !== group) { if (cmd) noteCommand_(cmd, 'ไม่ตอบ: พิมพ์ในกลุ่มที่ไม่ได้เลือกไว้ในหน้าผู้ดูแล'); return; }
+  const groups = selectedGroups_();
+  if (src.type === 'group' && !groups.length) { if (cmd) noteCommand_(cmd, 'ไม่ตอบ: ยังไม่ได้เลือก "กลุ่มไลน์ที่ให้บอทตอบ" ในหน้าผู้ดูแล'); return; }
+  if (src.type === 'group' && groups.indexOf(src.groupId) < 0) { if (cmd) noteCommand_(cmd, 'ไม่ตอบ: พิมพ์ในกลุ่มที่ไม่ได้เลือกไว้ในหน้าผู้ดูแล'); return; }
   if (!cmd) return;
   try {
     handleText_(ev);

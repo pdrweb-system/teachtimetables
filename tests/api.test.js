@@ -130,6 +130,13 @@ r = say('แจ้งตารางสอนแทน', inG('G1', 'U2'));
 ok(r.length === 1 && r[0].payload.messages[0].type === 'text' && r[0].payload.messages[0].text.indexOf('ยังไม่มีการจัดสอนแทน') >= 0, 'no assignment today → short text');
 globalThis.todayStr_ = () => date;
 ok(post('setLineGroup', [AP, '']).result === true && !settings_()['LINE groupId'], 'admin can clear the group');
+// เลือกได้หลายกลุ่ม (กลุ่มครู + กลุ่มทดสอบ)
+ok(post('setLineGroup', [AP, ['G1', 'GNEW2']]).result === true && settings_()['LINE groupId'] === 'G1,GNEW2', 'admin picks two groups');
+ok(say('แจ้งตารางสอนแทน', inG('G1', 'U2')).length === 1 && say('แจ้งตารางสอนแทน', inG('GNEW2', 'U2')).length === 1, 'both selected groups get a reply');
+ok(say('แจ้งตารางสอนแทน', inG('GOTHER', 'UX')).length === 0, 'a group that is not selected is still ignored');
+const ag2 = post('getAdminData', [AP]).result;
+ok(ag2.groupIds.join() === 'G1,GNEW2' && ag2.groupId === 'G1', 'getAdminData lists the selected groups');
+ok(post('setLineGroup', [AP, ['G1', 'GNOPE']]).ok === false && settings_()['LINE groupId'] === 'G1,GNEW2', 'an unknown group in the list is rejected and nothing changes');
 post('setLineGroup', [AP, 'G1']);
 
 const admin = post('getAdminData', [AP]).result;
