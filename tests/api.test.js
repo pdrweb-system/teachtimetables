@@ -141,6 +141,7 @@ post('setLineGroup', [AP, 'G1']);
 
 const rd_admin = () => require('fs').readFileSync(require('path').join(__dirname, '../admin.html'), 'utf8');
 const admin = post('getAdminData', [AP]).result;
+ok(get('', []).result.version === APP_VERSION, 'opening /exec in a browser shows the Code.gs version');
 ok(admin.version === APP_VERSION && rd_admin().indexOf("var CODE_VERSION = '" + APP_VERSION + "'") >= 0, 'admin page expects the same Code.gs version (APP_VERSION) as getAdminData reports');
 ok(admin.hasToken && admin.groupId === 'G1' && admin.sheetUrl && admin.webAppUrl, 'getAdminData (with sheet/web app URL)');
 ok(get('getStats', ['2026-09']).result.dates.length === 1, 'getStats');

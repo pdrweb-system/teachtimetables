@@ -41,7 +41,7 @@ const TH_MONTHS = ['มกราคม', 'กุมภาพันธ์', 'ม�
   'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
 const TZ = 'Asia/Bangkok';
 // เวอร์ชันของโค้ดนี้ — หน้าผู้ดูแลแสดงค่านี้ ใช้ตรวจว่า URL /exec ที่หน้าเว็บเรียกอยู่ ใช้โค้ดที่วางล่าสุดแล้วหรือยัง (เปลี่ยนทุกครั้งที่แก้ Code.gs)
-const APP_VERSION = '2026-11-24b';
+const APP_VERSION = '2026-11-24c';
 const PROP = PropertiesService.getScriptProperties();
 
 // ───────────────────────── JSON API (หน้าเว็บอยู่บน GitHub Pages) ─────────────────────────
@@ -73,7 +73,7 @@ const POST_API = {
 function doGet(e) {
   const p = (e && e.parameter) || {};
   const fn = p.fn;
-  if (!fn) return jsonOut_({ ok: true, result: { service: 'ระบบจัดสอนแทน API', time: nowStr_() } });
+  if (!fn) return jsonOut_({ ok: true, result: { service: 'ระบบจัดสอนแทน API', version: APP_VERSION, time: nowStr_() } });
   if (!GET_API[fn]) return jsonOut_({ ok: false, error: 'ไม่รู้จักคำสั่ง: ' + fn });
   try {
     const args = p.args ? JSON.parse(p.args) : [];
