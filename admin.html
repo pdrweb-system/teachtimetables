@@ -409,6 +409,8 @@ function loadLine() {
   run('getAdminData', ADMIN.pw).then(renderLine).catch(fail).then(function () { loading(false); });
 }
 
+// เวอร์ชันของ Code.gs ที่หน้านี้คาดว่าจะเจอ — ต้องตรงกับ APP_VERSION ใน apps-script/Code.gs (แก้คู่กัน)
+var CODE_VERSION = '2026-11-24b';
 function renderLine(d) {
   // Apps Script เวอร์ชันก่อน 2026-11-24 ส่งมาแค่ groupId (กลุ่มเดียว) ไม่มี groupIds — ยังไม่ได้วาง Code.gs ใหม่ + Deploy
   d.oneGroupOnly = !d.groupIds;
@@ -420,6 +422,9 @@ function renderLine(d) {
   $('#cfgHow').style.display = inCfg ? 'none' : '';
   $('#cfgLine').value = "apiUrl: '" + (apiUrl() || '') + "'";
   var html = '<div class="kv">' +
+    // เวอร์ชันของ Code.gs ที่ URL /exec นี้ใช้อยู่จริง (ต้องตรงกับ APP_VERSION ใน apps-script/Code.gs ล่าสุด)
+    '<div class="muted">Apps Script</div><div>' + (d.version === CODE_VERSION ? '<span class="pill ok">เวอร์ชันล่าสุด</span> <span class="small muted">' + h(d.version) + '</span>'
+      : '<span class="pill no">' + (d.version ? 'เวอร์ชัน ' + h(d.version) : 'เวอร์ชันเก่า') + '</span> <span class="small muted">ยังไม่ใช่โค้ดล่าสุด (' + CODE_VERSION + ') — ดูวิธีแก้ในคู่มือ หัวข้อ “วางโค้ดใหม่แล้วยังเหมือนเดิม”</span>') + '</div>' +
     '<div class="muted">บอท</div><div>' + (d.bot ? (d.bot.error ? '<span class="pill no">ผิดพลาด</span> ' + h(d.bot.error) : '<b>' + h(d.bot.name) + '</b> <span class="muted small">' + h(d.bot.basicId || '') + '</span>') : '<span class="pill no">ยังไม่ใส่ Token</span>') + '</div>' +
     '<div class="muted">รับ event จาก LINE ล่าสุด</div><div>' + (d.lastEvent ? '<span class="pill ok">ได้รับแล้ว</span> <span class="small muted">' + h(d.lastEvent) + '</span>' : '<span class="pill no">ยังไม่เคยได้รับ</span> <span class="small muted">ตรวจ Webhook / การส่งต่อจากระบบเดิม</span>') + '</div>' +
     (d.lastCommand ? '<div class="muted">คำสั่งล่าสุด</div><div><span class="pill ' + (/→ ตอบแล้ว$/.test(d.lastCommand) ? 'ok">ตอบแล้ว' : 'no">ไม่ได้ตอบ') + '</span> <span class="small muted">' + h(d.lastCommand) + '</span></div>' :
