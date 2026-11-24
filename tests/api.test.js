@@ -102,13 +102,17 @@ ok(/\/ group$/.test(ag.lastEvent) && ag.lastMismatch === '', 'admin sees the las
 let r = say('แจ้งตารางสอนแทน', inG('G1', 'U2'));
 ok(r.length === 1 && r[0].payload.messages.length === 1 && r[0].payload.messages[0].type === 'flex', 'แจ้งตารางสอนแทน → Flex card only (reply, no tagging)');
 ok(!JSON.stringify(r[0].payload).includes('mention'), 'no mention in the reply');
-['คำสั่ง', 'help', 'สอนแทน', 'สอนแทนพรุ่งนี้', 'แจ้งตารางสอนแทนมะรืน', 'ลงทะเบียน สมชาย', 'ตั้งกลุ่มนี้', 'แจ้งตารางสอนแทนครับ', 'สวัสดี'].forEach(t => {
+['คำสั่ง', 'help', 'สอนแทน', 'สอนแทนพรุ่งนี้', 'แจ้งตารางสอนแทนมะรืน', 'แจ้งสอนแทนมะรืนนี้', 'ลงทะเบียน สมชาย', 'ตั้งกลุ่มนี้', 'แจ้ง สอน', 'สวัสดี', 'วันนี้ใครช่วยดูเรื่องการแจ้งสอนแทนให้หน่อยครับ เพราะครูหลายท่านยังไม่ทราบ'].forEach(t => {
   ok(say(t, inG('G1', 'U2')).length === 0, 'other words are ignored: ' + t);
 });
 r = say('แจ้งตารางสอนแทนพรุ่งนี้', inG('G1', 'U2'));
 ok(r.length === 1 && r[0].payload.messages.length === 1, 'แจ้งตารางสอนแทนพรุ่งนี้ → one reply (tomorrow)');
+['แจ้งสอนแทน', 'แจ้งสอนแทนค่ะ', 'แจ้งตารางสอนแทนครับ', 'รบกวน แจ้งสอนแทน ด้วยค่ะ', 'แจ้งสอนแทนพรุ่งนี้ค่ะ'].forEach(t => {
+  const r = say(t, inG('G1', 'U2'));
+  ok(r.length === 1, 'answers a message that contains the command: ' + t);
+});
 ok(settings_()['LINE groupId'] === 'G1', 'ตั้งกลุ่มนี้ no longer changes the group');
-ok(/"แจ้งตารางสอนแทนพรุ่งนี้" → ตอบแล้ว$/.test(post('getAdminData', [AP]).result.lastCommand), 'admin sees the last command was answered');
+ok(/"แจ้งสอนแทนพรุ่งนี้ค่ะ" → ตอบแล้ว$/.test(post('getAdminData', [AP]).result.lastCommand), 'admin sees the last command was answered');
 say('แจ้งตารางสอนแทน', inG('GOTHER', 'UX'));
 ok(/ไม่ตอบ: พิมพ์ในกลุ่มที่ไม่ได้เลือก/.test(post('getAdminData', [AP]).result.lastCommand), 'admin sees why a command from another group was not answered');
 const realFetch0 = UrlFetchApp.fetch;

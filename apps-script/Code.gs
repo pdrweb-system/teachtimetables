@@ -41,7 +41,7 @@ const TH_MONTHS = ['มกราคม', 'กุมภาพันธ์', 'ม�
   'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
 const TZ = 'Asia/Bangkok';
 // เวอร์ชันของโค้ดนี้ — หน้าผู้ดูแลแสดงค่านี้ ใช้ตรวจว่า URL /exec ที่หน้าเว็บเรียกอยู่ ใช้โค้ดที่วางล่าสุดแล้วหรือยัง (เปลี่ยนทุกครั้งที่แก้ Code.gs)
-const APP_VERSION = '2026-11-24c';
+const APP_VERSION = '2026-11-24d';
 const PROP = PropertiesService.getScriptProperties();
 
 // ───────────────────────── JSON API (หน้าเว็บอยู่บน GitHub Pages) ─────────────────────────
@@ -1039,11 +1039,21 @@ function handleEvent_(ev) {
   }
 }
 
-// ข้อความนี้เป็นคำสั่งของบอทหรือไม่ (คืนคำสั่งแบบไม่มีเว้นวรรค หรือ '' ถ้าไม่ใช่)
+// ข้อความนี้เป็นคำสั่งของบอทหรือไม่ (คืนข้อความแบบไม่มีเว้นวรรค หรือ '' ถ้าไม่ใช่) — ดู commandDay_
 function commandOf_(ev) {
   if (ev.type !== 'message' || !ev.message || ev.message.type !== 'text') return '';
   const text = str_(ev.message.text).replace(/\s+/g, '');
-  return Object.prototype.hasOwnProperty.call(LINE_COMMANDS, text) ? text : '';
+  return commandDay_(text) === null ? '' : text;
+}
+
+// คำสั่งของวันไหน (จำนวนวันนับจากวันนี้) หรือ null ถ้าไม่ใช่คำสั่ง — text ต้องไม่มีเว้นวรรค
+// ข้อความที่มีคำสั่งอยู่ข้างใน (เช่น "แจ้งสอนแทนค่ะ", "รบกวนแจ้งตารางสอนแทนพรุ่งนี้ครับ") นับเป็นคำสั่ง (ผู้ใช้สั่ง 2026-11-24)
+// แต่ยาวไม่เกิน LINE_CMD_MAX_LEN เพื่อไม่ให้บอทตอบประโยคยาวที่แค่พูดถึงคำนี้ และวันอื่นที่บอทไม่รองรับ (เช่น มะรืน) ไม่ตอบ (กันตอบผิดวัน)
+function commandDay_(text) {
+  if (!text || text.length > LINE_CMD_MAX_LEN) return null;
+  if (!LINE_CMD_WORDS.some(function (w) { return text.indexOf(w) >= 0; })) return null;
+  if (/มะรืน|เมื่อวาน|สัปดาห์|อาทิตย์หน้า/.test(text)) return null;
+  return text.indexOf('พรุ่งนี้') >= 0 ? 1 : 0;
 }
 
 // ผลของคำสั่งล่าสุด (ตอบแล้ว / ไม่ตอบเพราะอะไร / error จาก LINE) ให้หน้าผู้ดูแลแสดง — คำสั่งมีไม่บ่อย จึงเขียนทุกครั้ง
@@ -1080,15 +1090,16 @@ function reply_(token, messages) {
   lineApi_('/v2/bot/message/reply', { replyToken: token, messages: messages });
 }
 
-/** คำสั่งที่บอทตอบ → วันที่นับจากวันนี้ (ต้องตรงกับ LINE_CMD ใน index.html); ข้อความอื่นไม่ตอบ */
-const LINE_COMMANDS = { 'แจ้งตารางสอนแทน': 0, 'แจ้งตารางสอนแทนพรุ่งนี้': 1 };
+/** คำที่ทำให้บอทตอบ (มีคำใดคำหนึ่งอยู่ในข้อความ) + "พรุ่งนี้" = ของวันพรุ่งนี้ — index.html คัดลอก LINE_CMD ซึ่งต้องเป็นหนึ่งในคำเหล่านี้ */
+const LINE_CMD_WORDS = ['แจ้งตารางสอนแทน', 'แจ้งสอนแทน'];
+const LINE_CMD_MAX_LEN = 40; // ตัวอักษร (ไม่นับเว้นวรรค)
 
-/** "แจ้งตารางสอนแทน" (วันนี้) / "แจ้งตารางสอนแทนพรุ่งนี้" → reply เป็นการ์ด Flex; เว้นวรรคในคำสั่งไม่มีผล */
+/** ข้อความที่มี "แจ้งตารางสอนแทน"/"แจ้งสอนแทน" (วันนี้; มี "พรุ่งนี้" = ของพรุ่งนี้) → reply เป็นการ์ด Flex; เว้นวรรคไม่มีผล */
 function handleText_(ev) {
-  const text = str_(ev.message.text).replace(/\s+/g, '');
-  if (!Object.prototype.hasOwnProperty.call(LINE_COMMANDS, text)) return;
+  const day = commandDay_(str_(ev.message.text).replace(/\s+/g, ''));
+  if (day === null) return;
 
-  const dd = getDateData(todayStr_(LINE_COMMANDS[text]));
+  const dd = getDateData(todayStr_(day));
   if (!dd.subs.length) {
     reply_(ev.replyToken, [{ type: 'text', text: 'ยังไม่มีการจัดสอนแทนของ' + dd.thaiDate }]);
     return;
