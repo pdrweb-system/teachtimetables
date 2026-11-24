@@ -414,6 +414,8 @@ function renderLine(d) {
   var html = '<div class="kv">' +
     '<div class="muted">บอท</div><div>' + (d.bot ? (d.bot.error ? '<span class="pill no">ผิดพลาด</span> ' + h(d.bot.error) : '<b>' + h(d.bot.name) + '</b> <span class="muted small">' + h(d.bot.basicId || '') + '</span>') : '<span class="pill no">ยังไม่ใส่ Token</span>') + '</div>' +
     '<div class="muted">รับ event จาก LINE ล่าสุด</div><div>' + (d.lastEvent ? '<span class="pill ok">ได้รับแล้ว</span> <span class="small muted">' + h(d.lastEvent) + '</span>' : '<span class="pill no">ยังไม่เคยได้รับ</span> <span class="small muted">ตรวจ Webhook / การส่งต่อจากระบบเดิม</span>') + '</div>' +
+    (d.lastCommand ? '<div class="muted">คำสั่งล่าสุด</div><div><span class="pill ' + (/→ ตอบแล้ว$/.test(d.lastCommand) ? 'ok">ตอบแล้ว' : 'no">ไม่ได้ตอบ') + '</span> <span class="small muted">' + h(d.lastCommand) + '</span></div>' :
+      '<div class="muted">คำสั่งล่าสุด</div><div><span class="small muted">ยังไม่เคยมีคนพิมพ์คำสั่งที่ระบบนี้ได้รับ</span></div>') +
     (d.lastMismatch ? '<div class="muted">ปัญหา</div><div><span class="pill no">บอทไม่ตรง</span> <span class="small muted">' + h(d.lastMismatch) + ' — วาง Token ของบอทตัวที่ส่ง event มา</span></div>' : '') +
     '<div class="muted">กลุ่มรับประกาศ</div><div>' + (d.groupId ? '<span class="pill ok">เลือกแล้ว</span>' : '<span class="pill no">ยังไม่เลือก</span>') + '</div>' +
     '</div>' +

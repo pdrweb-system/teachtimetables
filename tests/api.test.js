@@ -108,6 +108,15 @@ ok(!JSON.stringify(r[0].payload).includes('mention'), 'no mention in the reply')
 r = say('แจ้งตารางสอนแทนพรุ่งนี้', inG('G1', 'U2'));
 ok(r.length === 1 && r[0].payload.messages.length === 1, 'แจ้งตารางสอนแทนพรุ่งนี้ → one reply (tomorrow)');
 ok(settings_()['LINE groupId'] === 'G1', 'ตั้งกลุ่มนี้ no longer changes the group');
+ok(/"แจ้งตารางสอนแทนพรุ่งนี้" → ตอบแล้ว$/.test(post('getAdminData', [AP]).result.lastCommand), 'admin sees the last command was answered');
+say('แจ้งตารางสอนแทน', inG('GOTHER', 'UX'));
+ok(/ไม่ตอบ: พิมพ์ในกลุ่มที่ไม่ได้เลือก/.test(post('getAdminData', [AP]).result.lastCommand), 'admin sees why a command from another group was not answered');
+const realFetch0 = UrlFetchApp.fetch;
+UrlFetchApp.fetch = (url, opt) => (/message\/reply/.test(url) ? { getResponseCode: () => 400, getContentText: () => JSON.stringify({ message: 'Invalid reply token' }) } : realFetch0(url, opt));
+const realErr0 = console.error; console.error = () => {};
+say('แจ้งตารางสอนแทน', inG('G1', 'U2'));
+UrlFetchApp.fetch = realFetch0; console.error = realErr0;
+ok(/ตอบไม่สำเร็จ: LINE 400: Invalid reply token/.test(post('getAdminData', [AP]).result.lastCommand), 'admin sees the LINE error when a reply fails');
 ok(say('แจ้งตารางสอนแทน', inG('GOTHER', 'UX')).length === 0, 'other group: ignored');
 say('hi', inG('GNEW2', 'UZ'));
 ok(Object.keys(groupsSeen_()).indexOf('GNEW2') >= 0 && settings_()['LINE groupId'] === 'G1', 'new groups are still listed after one is chosen, without changing the choice');

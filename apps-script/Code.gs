@@ -796,6 +796,7 @@ function getAdminData(pw) {
     groups: knownGroups_(hasToken),
     lastEvent: PROP.getProperty('LAST_EVENT') || '',
     lastMismatch: PROP.getProperty('LAST_MISMATCH') || '',
+    lastCommand: PROP.getProperty('LAST_COMMAND') || '',
   };
 }
 
@@ -1012,11 +1013,32 @@ function ok_() { return ContentService.createTextOutput('OK'); }
 // คำสั่งเดียวที่บอทตอบ: "แจ้งตารางสอนแทน" (ดู handleText_) — ไม่ทักทาย ไม่ตอบ join ฯลฯ
 function handleEvent_(ev) {
   const src = ev.source || {};
-  if (src.type === 'room') return;
+  const cmd = commandOf_(ev);
+  if (src.type === 'room') { if (cmd) noteCommand_(cmd, 'ไม่ตอบ: พิมพ์ในห้องแชต (room) — ใช้ในกลุ่มหรือแชต 1:1 แทน'); return; }
   if (src.type === 'group' && src.groupId) noteGroup_(src.groupId);
   const group = settings_()[SET.GROUP];
-  if (src.type === 'group' && (!group || src.groupId !== group)) return;
-  if (ev.type === 'message' && ev.message && ev.message.type === 'text') handleText_(ev);
+  if (src.type === 'group' && !group) { if (cmd) noteCommand_(cmd, 'ไม่ตอบ: ยังไม่ได้เลือก "กลุ่มไลน์ที่ให้บอทตอบ" ในหน้าผู้ดูแล'); return; }
+  if (src.type === 'group' && src.groupId !== group) { if (cmd) noteCommand_(cmd, 'ไม่ตอบ: พิมพ์ในกลุ่มที่ไม่ได้เลือกไว้ในหน้าผู้ดูแล'); return; }
+  if (!cmd) return;
+  try {
+    handleText_(ev);
+    noteCommand_(cmd, 'ตอบแล้ว');
+  } catch (err) {
+    noteCommand_(cmd, 'ตอบไม่สำเร็จ: ' + err.message);
+    throw err;
+  }
+}
+
+// ข้อความนี้เป็นคำสั่งของบอทหรือไม่ (คืนคำสั่งแบบไม่มีเว้นวรรค หรือ '' ถ้าไม่ใช่)
+function commandOf_(ev) {
+  if (ev.type !== 'message' || !ev.message || ev.message.type !== 'text') return '';
+  const text = str_(ev.message.text).replace(/\s+/g, '');
+  return Object.prototype.hasOwnProperty.call(LINE_COMMANDS, text) ? text : '';
+}
+
+// ผลของคำสั่งล่าสุด (ตอบแล้ว / ไม่ตอบเพราะอะไร / error จาก LINE) ให้หน้าผู้ดูแลแสดง — คำสั่งมีไม่บ่อย จึงเขียนทุกครั้ง
+function noteCommand_(cmd, result) {
+  try { PROP.setProperty('LAST_COMMAND', nowStr_() + ' — "' + cmd + '" → ' + result); } catch (e) { /* ไม่ให้การบันทึกทำให้ตอบไม่ได้ */ }
 }
 
 // กลุ่มที่เคยเห็น event: { groupId: 'yyyy-MM-dd HH:mm:ss' (ล่าสุด) } เก็บใน Script Properties (เก็บไม่เกิน 20 กลุ่ม)
